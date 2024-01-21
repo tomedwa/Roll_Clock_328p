@@ -28,4 +28,6 @@ void USART_init();
 void USART_transmit_character(unsigned char data);
 void USART_transmit_string(char* string);
 
+/* will need some receive functionality soon */
+
 #endif /* ATMEGA328P_USART_H_ */

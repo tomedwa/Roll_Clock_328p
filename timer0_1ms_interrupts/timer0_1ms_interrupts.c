@@ -36,10 +36,10 @@ static volatile uint32_t clockTicks;
 */
 void timer0_init() {
 	clockTicks = 0L;
-	TCNT0 = 0;		/* Clear the timer */
-	OCR0A = 62;		/* Set the output compare value to be 124 */
+	TCNT0 = 0;				/* Clear the timer */
+	OCR0A = 62;				/* Set the output compare value to be 124 */
 	TCCR0A = (1<<WGM01);	/* Set timer to clear on compare match (CTC mode) */
-	TCCR0B = (1<<CS02);	/* Divide the clock by 256 */
+	TCCR0B = (1<<CS02);		/* Divide the clock by 256 */
 	TIMSK0 |= (1<<OCIE0A);	/* Enable interrupts on output compare match */
 	TIFR0 &= (1<<OCF0A);	/* Clear interrupt flag */
 }
