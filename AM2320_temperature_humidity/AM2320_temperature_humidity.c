@@ -30,6 +30,7 @@
 #include <avr/io.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <avr/interrupt.h>
 #define F_CPU 16000000	// Clock frequency of CPU
 #include <util/delay.h>
 #include "AM2320_temperature_humidity.h"
@@ -41,6 +42,7 @@
 *	Initialise the AM2320 temperature and humidity sensor.
 */
 void AM2320_init() {
+	i2c_init();
 	i2c_start_wait(AM2320_ADDR | AM2320_I2C_WRITE);
 	i2c_write(0x00); // Just sending a wakeup command
 	i2c_stop();
@@ -54,18 +56,24 @@ void AM2320_init() {
 *	TEMPERATURE_HUMIDITY array found in the header file.
 *	temperature is in degrees celsius and humidity in
 *	% from 0-100
+*
+*	NOTE: The sensor appears to dislike being read too
+*	frequently, so I have found that updating every
+*	2 seconds works best.
 */
 void AM2320_update_temperature_humidity() {
 	uint16_t humidity = 0;
 	uint16_t temperature = 0;
+	uint8_t interruptsOn = bit_is_set(SREG, SREG_I);
 	
+	cli();	/* Disable interrupts */
 	i2c_start_wait(AM2320_ADDR | AM2320_I2C_WRITE);
 	i2c_write(AM2320_COMMAND_READ_REG_DATA);
 	i2c_write(AM2320_HUMIDITY_REG_HIGH);
 	i2c_write(0x04); // number of registers to read
 	i2c_stop();
 	
-	_delay_ms(2); // Wait for sensor
+	_delay_ms(10); // Wait for sensor
 
 	i2c_start_wait(AM2320_ADDR | AM2320_I2C_READ);
 	i2c_readAck(); // Ignore returned function code.
@@ -81,6 +89,10 @@ void AM2320_update_temperature_humidity() {
 	i2c_readNak(); // Read last byte with NAK
 	
 	i2c_stop();
+	
+	if(interruptsOn) {
+		sei(); /* Re-enable interrupts */
+	}
 	
 	TEMPERATURE_HUMIDITY[0] = (float)temperature / 10;
 	TEMPERATURE_HUMIDITY[1] = (float)humidity / 10;

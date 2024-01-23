@@ -19,7 +19,7 @@
 
 /* define CPU frequency in Mhz here if not defined in Makefile */
 #ifndef F_CPU
-#define F_CPU 4000000UL
+#define F_CPU 16000000UL
 #endif
 
 /* I2C clock in Hz */
@@ -39,7 +39,6 @@ void i2c_init(void)
   TWBR = ((F_CPU/SCL_CLOCK)-16)/2;  /* must be > 10 for stable operation */
 
 }/* i2c_init */
-
 
 /*************************************************************************	
   Issues a start condition and sends address and transfer direction.

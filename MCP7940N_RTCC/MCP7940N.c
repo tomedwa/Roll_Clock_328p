@@ -1,11 +1,13 @@
 /*
  **************************************************************
- * MCP7940M.c
+ * MCP7940N.c
  * Author: Tom
  * Date: 17/11/2023
  * AVR Library for the real time clock and calendar chip,
  * MCP7940M. This library uses the Peter Fleury i2cmaster.h
- * interface to drive the i2c comms.
+ * interface to drive the i2c comms. This library is intended
+ * to be used with the Atmega328p MCU, but Im sure it can be
+ * modified to be compatible with other MCUs.
  **************************************************************
  * EXTERNAL FUNCTIONS
  **************************************************************
@@ -39,8 +41,9 @@
 
 #include <avr/io.h>
 #include <stdio.h>
+#include <avr/interrupt.h>
 
-#include "MCP7940M.h"
+#include "MCP7940N.h"
 #include "../pFleury_i2c_stuff/i2cmaster.h"
 
 uint8_t RTC_TIME[6];
@@ -51,10 +54,22 @@ uint8_t RTC_TIME[6];
  * Initialise the RTC and enable external oscillator.
 */
 void RTC_init() {
+	i2c_init();
 	i2c_start(RTC_ADDR | RTC_WRITE);
 	i2c_write(RTC_SECONDS_REGISTER);
 	i2c_write(RTC_OSCILLATOR_ENABLE);
 	i2c_stop();
+	
+	RTC_ALARM_STATUS = RTC_ALARM_INACTIVE;
+	RTC_ALARM_INTERRUPT = RTC_ALARM_INTERRUPT_NOT_DETECTED;
+	 
+	/* Initialise Pin D7 on the Atmega328p to detect an external interrupt signal */
+	DDRD &= ~(1<<7);
+	PCMSK2 |= (1 << 7); /* Enable PCINT23 (pin D7) for external interrupts */
+	PCICR |= (1<<2);
+	
+	sei();
+		
 }
 
 /*
@@ -494,4 +509,99 @@ void RTC_set_date(uint8_t day, uint8_t dayDate, uint8_t month, uint8_t year) {
 	RTC_set_date_day(dayDate);
 	RTC_set_month(month);
 	RTC_set_year(year);
+}
+
+void RTC_alarm_init() {
+	i2c_start(RTC_ADDR | RTC_WRITE);
+	i2c_write(RTC_CONTROL_REGISTER);
+	i2c_write(0x10);
+	i2c_stop();
+	
+	i2c_start(RTC_ADDR | RTC_WRITE);
+	i2c_write(RTC_ALARM_WEEKDAY_REGISTER);
+	i2c_write(0x80); /* Alarm interrupt output polarity bit, MFP is a logic level high */
+	i2c_stop();
+}
+
+void RTC_set_alarm(uint32_t alarmTime) {
+	RTC_ALARM_TIME[0] = alarmTime & 0xFF; /* Extract and store seconds */
+	RTC_ALARM_TIME[1] = (alarmTime & 0xFF00) >> 8; /* Extract and store minutes */
+	RTC_ALARM_TIME[2] = (alarmTime & 0xFF0000) >> 16; /* Extract and store hours */
+	
+	i2c_start(RTC_ADDR | RTC_WRITE);
+	i2c_write(RTC_ALARM_SECONDS_REGISTER);
+	i2c_write(RTC_ALARM_TIME[0]);
+	i2c_stop();
+}
+
+uint8_t RTC_get_alarm_seconds_int() {
+	uint8_t secHex = RTC_ALARM_TIME[0];
+	return (((secHex & 0xF0) >> 4) * 10) + (secHex & 0x0F);
+}
+
+uint8_t RTC_get_alarm_minutes_int() {
+	uint8_t minHex = RTC_ALARM_TIME[1];
+	return (((minHex & 0xF0) >> 4) * 10) + (minHex & 0x0F);
+}
+
+uint8_t RTC_get_alarm_hours_int() {
+	uint8_t hourHex = RTC_ALARM_TIME[2];
+	return (((hourHex & 0xF0) >> 4) * 10) + (hourHex & 0x0F);
+}
+
+char* RTC_get_alarm_seconds_string() {
+	static char secStr[3];
+	snprintf(secStr, sizeof(secStr), "%d", RTC_get_alarm_seconds_int());
+	return secStr;	
+}
+
+char* RTC_get_alarm_minutes_string() {
+	static char minStr[3];
+	snprintf(minStr, sizeof(minStr), "%d", RTC_get_alarm_minutes_int());
+	return minStr;
+}
+
+char* RTC_get_alarm_hours_string() {
+	char hourStr[3];
+	char* returnString;
+	snprintf(hourStr, sizeof(hourStr), "%d", RTC_get_alarm_hours_int());
+	returnString = hourStr;
+	return returnString;
+}
+
+uint8_t RTC_alarm_active_check() {
+	if ((RTC_ALARM_STATUS == RTC_ALARM_INACTIVE) && (RTC_ALARM_INTERRUPT == RTC_ALARM_INTERRUPT_DETECTED)) {
+		if ((RTC_get_time_min_int() == RTC_get_alarm_minutes_int()) && (RTC_get_time_hour_int() == RTC_get_alarm_hours_int())) {
+			RTC_ALARM_STATUS = RTC_ALARM_ACTIVE;
+			RTC_ALARM_INTERRUPT = RTC_ALARM_INTERRUPT_NOT_DETECTED;
+		} else {
+			RTC_ALARM_INTERRUPT = RTC_ALARM_INTERRUPT_NOT_DETECTED;
+			RTC_alarm_deactivate();
+		}
+	}
+	
+	return RTC_ALARM_STATUS;
+}
+
+void RTC_alarm_deactivate() {
+	RTC_alarm_init();
+	
+	RTC_ALARM_STATUS = RTC_ALARM_INACTIVE;
+	RTC_ALARM_INTERRUPT = RTC_ALARM_INTERRUPT_NOT_DETECTED;
+}
+
+uint8_t RTC_get_time_sec_int() {
+	return (RTC_TIME[0] * 10) + RTC_TIME[1];
+}
+
+uint8_t RTC_get_time_min_int() {
+	return (RTC_TIME[2] * 10) + RTC_TIME[3];
+}
+
+uint8_t RTC_get_time_hour_int() {
+	return (RTC_TIME[4] * 10) + RTC_TIME[5];
+}
+
+ISR(PCINT2_vect) {
+	RTC_ALARM_INTERRUPT = RTC_ALARM_INTERRUPT_DETECTED;
 }

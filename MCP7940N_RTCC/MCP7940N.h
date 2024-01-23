@@ -1,11 +1,13 @@
 /*
  **************************************************************
- * MCP7940M.h
+ * MCP7940N.c
  * Author: Tom
  * Date: 17/11/2023
  * AVR Library for the real time clock and calendar chip,
  * MCP7940M. This library uses the Peter Fleury i2cmaster.h
- * interface to drive the i2c comms.
+ * interface to drive the i2c comms. This library is intended
+ * to be used with the Atmega328p MCU, but Im sure it can be
+ * modified to be compatible with other MCUs.
  **************************************************************
  * EXTERNAL FUNCTIONS
  **************************************************************
@@ -51,6 +53,10 @@
 #define RTC_DATE_DAY_REGISTER	0x04
 #define RTC_MONTH_REGISTER		0x05
 #define RTC_YEAR_REGISTER		0x06
+#define RTC_CONTROL_REGISTER	0x07
+
+#define RTC_ALARM_SECONDS_REGISTER	0x0A
+#define RTC_ALARM_WEEKDAY_REGISTER	0x0D
 
 #define RTC_MONDAY		0x01
 #define RTC_TUESDAY		0x02
@@ -73,8 +79,17 @@
 #define RTC_NOVEMBER	0x11
 #define RTC_DECEMBER	0x12
 
-// sec tens, sec ones, min tens, min ones, hour tens, hours ones
-extern uint8_t RTC_TIME[6]; 
+#define RTC_ALARM_ACTIVE	0x01
+#define RTC_ALARM_INACTIVE	0x00
+#define RTC_ALARM_INTERRUPT_DETECTED		0x01
+#define RTC_ALARM_INTERRUPT_NOT_DETECTED	0x00
+
+// 
+uint8_t RTC_TIME[6]; /* sec tens, sec ones, min tens, min ones, hour tens, hours ones */
+uint8_t RTC_ALARM_TIME[3]; /* Seconds, Minutes, Hours as hex numbers */
+uint8_t RTC_ALARM_STATUS;
+uint8_t RTC_ALARM_INTERRUPT;
+
 
 void RTC_init(); 
 uint8_t RTC_read_register(uint8_t regAddr);
@@ -89,6 +104,10 @@ uint8_t RTC_get_time_min_tens_int();
 uint8_t RTC_get_time_min_ones_int();
 uint8_t RTC_get_time_sec_tens_int();
 uint8_t RTC_get_time_sec_ones_int();
+
+uint8_t RTC_get_time_sec_int();
+uint8_t RTC_get_time_min_int();
+uint8_t RTC_get_time_hour_int();
 
 char* RTC_get_time_hour_string();
 char* RTC_get_time_min_string();
@@ -109,5 +128,18 @@ char* RTC_get_month_num_string();
 char* RTC_get_month_name_string();
 uint8_t RTC_get_year_int();
 char* RTC_get_year_string();
+
+void RTC_alarm_init();
+void RTC_alarm_deactivate();
+
+void RTC_set_alarm(uint32_t alarmTime);
+uint8_t RTC_get_alarm_seconds_int();
+uint8_t RTC_get_alarm_minutes_int();
+uint8_t RTC_get_alarm_hours_int();
+char* RTC_get_alarm_seconds_string();
+char* RTC_get_alarm_minutes_string();
+char* RTC_get_alarm_hours_string();
+
+uint8_t RTC_alarm_active_check();
 
 #endif /* MCP7940M_H_ */
