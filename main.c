@@ -54,20 +54,23 @@
 #define DISPLAY_INVERTED	0x01
 #define DISPLAY_NORMAL		0x00
 
+/* Settings Macros */
+#define SETTINGS_MODE_INACTIVE			0x00
+#define SETTINGS_MODE_A					0x01
+#define SETTINGS_MODE_A_IDLE			0x00
+#define SETTINGS_MODE_A_SET_TIME		0x01
+#define SETTINGS_MODE_A_SET_DATE		0x02
+#define SETTINGS_MODE_A_SET_ALARM		0x03
+#define SETTINGS_MODE_A_SET_TIME_HOLD_DIGIT 0x00
+#define SETTINGS_MODE_A_SET_TIME_INCREASE_DIGIT 0x01
 
-
-////////////////////
-#define SETTINGS_MODE_INACTIVE 0x00
-#define SETTINGS_MODE_ACTIVE 0x01
-#define SETTINGS_MASK_TIME_HOURS_TENS 0x00
-#define SETTINGS_MASK_TIME_HOURS_ONES 0x01
-#define SETTINGS_MASK_TIME_MINUTES_TENS 0x03
-#define SETTINGS_MASK_TIME_MINUTES_ONES 0x04
-#define	SETTINGS_MASK_TIME_SECONDS_TENS 0x06
-#define SETTINGS_MASK_TIME_SECONDS_ONES	0x07
-#define SETTINGS_TIME_INCREASE 0x01
-#define SETTINGS_TIME_DECREASE 0x02
-#define SETTINGS_TIME_INCREASE_DECREASE_IDLE 0x00
+/* Indexes for the time strings in this form, HH:MM:SS */
+#define TIME_STRING_INDEX_HOURS_TENS	0x00
+#define TIME_STRING_INDEX_HOURS_ONES	0x01
+#define TIME_STRING_INDEX_MINUTES_TENS	0x03
+#define TIME_STRING_INDEX_MINUTES_ONES	0x04
+#define TIME_STRING_INDEX_SECONDS_TENS	0x06
+#define TIME_STRING_INDEX_SECONDS_ONES	0x07
 
 /* Function prototypes */
 void hardware_init();
@@ -79,11 +82,13 @@ void update_temp_humidity_sensor(uint32_t currentTime, uint32_t* previousTimes);
 void display_date_and_time();
 void display_temp_humidity();
 void alarm_match_handling(uint32_t currentTime, uint32_t* previousTimes, uint8_t* displayInvertedStatus);
-void settings_change_time(uint8_t timeSettingsChange, uint8_t* increaseOrDecreaseTimeFlag, char tempSettingsTime[9]);
+void settings_change_time(uint8_t settingsModeA_setTime_selectedTimeDigit, uint8_t* settingsModeA_setTime_increaseDigit, char tempSettingsTime[9]);
 void set_temp_settings_time(char tempSettingsTime[9]);
-void change_time_settings_inverted_rectange_position(uint8_t timeSettingsChange);
+void change_time_settings_inverted_rectange_position(uint8_t settingsModeA_setTime_selectedTimeDigit);
 void confirm_time_change(char tempSettingsTime[9]);
-void settings_increase_or_decrease_time(char tempSettingsTime[9], uint8_t* increaseOrDecreaseTimeFlag, uint8_t timeSettingsChange);
+void settings_increase_time(char tempSettingsTime[9], uint8_t* settingsModeA_setTime_increaseDigit, uint8_t settingsModeA_setTime_selectedTimeDigit);
+void settings_mode_A_main_screen(char tempSettingsTime[9], uint8_t* settingsModeA_mainScreenSelection, uint8_t* settingsModeA_mainScreenHighlight);
+void settings_mode_A_main_screen_inverted_rectangle(uint8_t settingsModeA_mainScreenHighlight);
 
 int main(void) {
 	hardware_init();
@@ -110,10 +115,13 @@ int main(void) {
 	buzzer_set_frequency(444);
 	buzzer_stop_tone();
 	
-	uint8_t settingsMode = 0;
-	uint8_t selected = 0;
-	uint8_t timeSettingsChange = SETTINGS_MASK_TIME_HOURS_TENS; 
-	uint8_t increaseOrDecreaseTimeFlag = SETTINGS_TIME_INCREASE_DECREASE_IDLE;
+	/* Settings variables */
+	uint8_t settingsMode = SETTINGS_MODE_INACTIVE;
+	uint8_t settingsModeA_mainScreenSelection = SETTINGS_MODE_A_IDLE;
+	uint8_t settingsModeA_mainScreenHighlight = SETTINGS_MODE_A_SET_TIME;
+	uint8_t settingsModeA_setTime_selectedTimeDigit = TIME_STRING_INDEX_HOURS_TENS;
+	uint8_t settingsModeA_setTime_increaseDigit = SETTINGS_MODE_A_SET_TIME_HOLD_DIGIT;
+	
 	char tempSettingsTime[9];
 	
 	// temp buttons for debugging
@@ -121,6 +129,13 @@ int main(void) {
 	DDRD &= ~(1 << 6);				// Time increase
 	
     while (1) {
+		
+		if ((settingsMode != SETTINGS_MODE_INACTIVE) && (displayInvertedStatus == DISPLAY_INVERTED)) {
+			RTC_alarm_deactivate();
+			OLED_display_invert(DISPLAY_NORMAL);
+		}
+		
+		
 		/* Update current system time */
 		currentTime = timer0_get_current_time(); 
 		
@@ -136,10 +151,23 @@ int main(void) {
 		/* Different functionality based on orientation */
 		switch(currentOrientation) {
 			case MODE_A:
-				if (settingsMode == 0) {
+				if (settingsMode == SETTINGS_MODE_INACTIVE) {
 					display_date_and_time();
-				} else {
-					settings_change_time(timeSettingsChange, &increaseOrDecreaseTimeFlag, tempSettingsTime);
+				} else if (settingsMode == SETTINGS_MODE_A) {
+					
+					if (settingsModeA_mainScreenSelection == SETTINGS_MODE_A_IDLE) {
+						settings_mode_A_main_screen(tempSettingsTime, &settingsModeA_mainScreenSelection, &settingsModeA_mainScreenHighlight);
+					} else if (settingsModeA_mainScreenSelection == SETTINGS_MODE_A_SET_TIME) {
+						settings_change_time(settingsModeA_setTime_selectedTimeDigit, &settingsModeA_setTime_increaseDigit, tempSettingsTime);
+					} else if (settingsModeA_mainScreenSelection == SETTINGS_MODE_A_SET_DATE) {
+						OLED_clear_buffer();
+						OLED_draw_string("set date", 0, 0, 8, 1, MODE_A);
+						OLED_display_buffer();
+					} else if (settingsModeA_mainScreenSelection == SETTINGS_MODE_A_SET_ALARM) {
+						OLED_clear_buffer();
+						OLED_draw_string("set alarm", 0, 0, 8, 1, MODE_A);
+						OLED_display_buffer();
+					}
 				}
 				break;
 			case MODE_B:
@@ -159,30 +187,65 @@ int main(void) {
 		
 		alarm_match_handling(currentTime, previousTimes, &displayInvertedStatus);
 		
-		// Settings shit
+		
+		
+		/* Select Button */
 		if (!!(PINC & (1 << 1))) {
-			if (settingsMode == 0) {
-				settingsMode = 1;
-				set_temp_settings_time(tempSettingsTime);	
-			} else if (settingsMode == 1) {
-				selected = 1;
-				if (timeSettingsChange == SETTINGS_MASK_TIME_SECONDS_ONES) {
-					settingsMode = 0;
-					timeSettingsChange = SETTINGS_MASK_TIME_HOURS_TENS;
+			
+			if (settingsMode == SETTINGS_MODE_INACTIVE) {
+				
+				if (currentOrientation == MODE_A) {
+					settingsMode = SETTINGS_MODE_A;
+				}
+				
+			} else if ((settingsMode == SETTINGS_MODE_A) && (settingsModeA_mainScreenSelection == SETTINGS_MODE_A_IDLE)) {
+				
+				settingsModeA_mainScreenSelection = settingsModeA_mainScreenHighlight;
+				
+				if (settingsModeA_mainScreenSelection == SETTINGS_MODE_A_SET_TIME) {
+					set_temp_settings_time(tempSettingsTime);
+				}
+				
+				settingsModeA_mainScreenHighlight = SETTINGS_MODE_A_SET_TIME;
+				
+				
+				
+			} else if (settingsModeA_mainScreenSelection == SETTINGS_MODE_A_SET_TIME) {
+				
+				if (settingsModeA_setTime_selectedTimeDigit == TIME_STRING_INDEX_SECONDS_ONES) {
+					settingsModeA_setTime_selectedTimeDigit = TIME_STRING_INDEX_HOURS_TENS;
+					settingsMode = SETTINGS_MODE_INACTIVE;
+					settingsModeA_mainScreenSelection = SETTINGS_MODE_A_IDLE;
+					settingsModeA_setTime_increaseDigit = SETTINGS_MODE_A_SET_TIME_HOLD_DIGIT;
 					confirm_time_change(tempSettingsTime);
 				} else {
-					timeSettingsChange++;
-					if ((timeSettingsChange == 2) || (timeSettingsChange == 5)) {
-						timeSettingsChange++;
+					settingsModeA_setTime_selectedTimeDigit++;
+					if ((settingsModeA_setTime_selectedTimeDigit == 2) || (settingsModeA_setTime_selectedTimeDigit == 5)) {
+						settingsModeA_setTime_selectedTimeDigit++;
 					}
 				}
 				
+			} else if (settingsModeA_mainScreenSelection == SETTINGS_MODE_A_SET_DATE) {
+				settingsMode = SETTINGS_MODE_INACTIVE;
+				settingsModeA_mainScreenSelection = SETTINGS_MODE_A_IDLE;
+			} else if (settingsModeA_mainScreenSelection == SETTINGS_MODE_A_SET_ALARM) {
+				settingsMode = SETTINGS_MODE_INACTIVE;
+				settingsModeA_mainScreenSelection = SETTINGS_MODE_A_IDLE;
 			}
 			
 		}
-		if (settingsMode == SETTINGS_MODE_ACTIVE) {
+
+		if (settingsMode == SETTINGS_MODE_A) {
 			if (!!(PIND & (1 << 6))) {
-				increaseOrDecreaseTimeFlag = SETTINGS_TIME_INCREASE;
+				if (settingsModeA_mainScreenSelection == SETTINGS_MODE_A_IDLE) {
+					if (settingsModeA_mainScreenHighlight == SETTINGS_MODE_A_SET_ALARM) {
+						settingsModeA_mainScreenHighlight = SETTINGS_MODE_A_SET_TIME;
+					} else {
+						settingsModeA_mainScreenHighlight++;
+					}
+				} else if (settingsModeA_mainScreenSelection == SETTINGS_MODE_A_SET_TIME) {
+					settingsModeA_setTime_increaseDigit = SETTINGS_MODE_A_SET_TIME_INCREASE_DIGIT;
+				}
 			}	
 		}
     }
@@ -282,20 +345,20 @@ void display_date_and_time() {
 	OLED_display_buffer();
 }
 
-void settings_change_time(uint8_t timeSettingsChange, uint8_t* increaseOrDecreaseTimeFlag, char tempSettingsTime[9]) {
-	
-	
+void settings_change_time(uint8_t settingsModeA_setTime_selectedTimeDigit, uint8_t* settingsModeA_setTime_increaseDigit, char tempSettingsTime[9]) {
 	OLED_clear_buffer();
 	
 	OLED_draw_string("Set Time", 21, 7, 16, 2, MODE_A);
 	
-	settings_increase_or_decrease_time(tempSettingsTime, increaseOrDecreaseTimeFlag, timeSettingsChange);
+	settings_increase_time(tempSettingsTime, settingsModeA_setTime_increaseDigit, settingsModeA_setTime_selectedTimeDigit);
 	
 	OLED_draw_string(tempSettingsTime, 6, 33, 25, 5, MODE_A);
 	
-	change_time_settings_inverted_rectange_position(timeSettingsChange);
+	change_time_settings_inverted_rectange_position(settingsModeA_setTime_selectedTimeDigit);
 	
 	OLED_display_buffer();
+	
+	
 }
 
 void display_temp_humidity() {
@@ -398,24 +461,24 @@ void set_temp_settings_time(char tempSettingsTime[9]) {
 	}
 }
 
-void change_time_settings_inverted_rectange_position(uint8_t timeSettingsChange) {
-	switch(timeSettingsChange) {
-		case SETTINGS_MASK_TIME_HOURS_TENS:
+void change_time_settings_inverted_rectange_position(uint8_t settingsModeA_setTime_selectedTimeDigit) {
+	switch(settingsModeA_setTime_selectedTimeDigit) {
+		case TIME_STRING_INDEX_HOURS_TENS:
 			OLED_invert_rectangle(3, 21, 30, 61);
 			break;
-		case SETTINGS_MASK_TIME_HOURS_ONES:
+		case TIME_STRING_INDEX_HOURS_ONES:
 			OLED_invert_rectangle(20, 38, 30, 61);
 			break;
-		case SETTINGS_MASK_TIME_MINUTES_TENS:
+		case TIME_STRING_INDEX_MINUTES_TENS:
 			OLED_invert_rectangle(46, 64, 30, 61);
 			break;
-		case SETTINGS_MASK_TIME_MINUTES_ONES:
+		case TIME_STRING_INDEX_MINUTES_ONES:
 			OLED_invert_rectangle(63, 81, 30, 61);
 			break;
-		case SETTINGS_MASK_TIME_SECONDS_TENS:
+		case TIME_STRING_INDEX_SECONDS_TENS:
 			OLED_invert_rectangle(89, 107, 30, 61);
 			break;
-		case SETTINGS_MASK_TIME_SECONDS_ONES:
+		case TIME_STRING_INDEX_SECONDS_ONES:
 			OLED_invert_rectangle(106, 124, 30, 61);
 			break;
 	}
@@ -428,30 +491,53 @@ void confirm_time_change(char tempSettingsTime[9]) {
 	RTC_set_time(hours, minutes, seconds);
 }
 
-void settings_increase_or_decrease_time(char tempSettingsTime[9], uint8_t* increaseOrDecreaseTimeFlag, uint8_t timeSettingsChange) {
-	if (*increaseOrDecreaseTimeFlag == SETTINGS_TIME_INCREASE_DECREASE_IDLE) {
+void settings_increase_time(char tempSettingsTime[9], uint8_t* settingsModeA_setTime_increaseDigit, uint8_t settingsModeA_setTime_selectedTimeDigit) {
+	if (*settingsModeA_setTime_increaseDigit == SETTINGS_MODE_A_SET_TIME_HOLD_DIGIT) {
 		return;
 	}
 	
 	uint8_t tempNum = 0;
 	
-	if (timeSettingsChange == SETTINGS_MASK_TIME_HOURS_TENS) {
-		tempNum = tempSettingsTime[timeSettingsChange] - 48;
+	if (settingsModeA_setTime_selectedTimeDigit == TIME_STRING_INDEX_HOURS_TENS) {
+		tempNum = tempSettingsTime[settingsModeA_setTime_selectedTimeDigit] - 48;
 		if (tempNum == 2) {
-			tempSettingsTime[timeSettingsChange] = '0';
+			tempSettingsTime[settingsModeA_setTime_selectedTimeDigit] = '0';
 		} else {
 			tempNum++;
-			tempSettingsTime[timeSettingsChange] = tempNum + 48;
+			tempSettingsTime[settingsModeA_setTime_selectedTimeDigit] = tempNum + 48;
 		}
 	} else {
-		tempNum = tempSettingsTime[timeSettingsChange] - 48;
+		tempNum = tempSettingsTime[settingsModeA_setTime_selectedTimeDigit] - 48;
 		if (tempNum == 9) {
-			tempSettingsTime[timeSettingsChange] = '0';
+			tempSettingsTime[settingsModeA_setTime_selectedTimeDigit] = '0';
 		} else {
 			tempNum++;
-			tempSettingsTime[timeSettingsChange] = tempNum + 48;
+			tempSettingsTime[settingsModeA_setTime_selectedTimeDigit] = tempNum + 48;
 		}
 	}
 	
-	*increaseOrDecreaseTimeFlag = SETTINGS_TIME_INCREASE_DECREASE_IDLE;
+	*settingsModeA_setTime_increaseDigit = SETTINGS_MODE_A_SET_TIME_HOLD_DIGIT;
+}
+
+void settings_mode_A_main_screen(char tempSettingsTime[9], uint8_t* settingsModeA_mainScreenSelection, uint8_t* settingsModeA_mainScreenHighlight) {
+	OLED_clear_buffer();
+	OLED_draw_string("Set Time", 6, 2, 16, 2, MODE_A);
+	OLED_draw_string("Set Date", 6, 22, 16, 2, MODE_A);
+	OLED_draw_string("Set Alarm", 6, 42, 16, 2, MODE_A);
+	settings_mode_A_main_screen_inverted_rectangle(*settingsModeA_mainScreenHighlight);
+	OLED_display_buffer();
+}
+
+void settings_mode_A_main_screen_inverted_rectangle(uint8_t settingsModeA_mainScreenHighlight) {
+	switch(settingsModeA_mainScreenHighlight) {
+		case SETTINGS_MODE_A_SET_TIME:
+			OLED_invert_rectangle(0, 128, 0, 20);
+			break;
+		case SETTINGS_MODE_A_SET_DATE:
+			OLED_invert_rectangle(0, 128, 20, 40);
+			break;
+		case SETTINGS_MODE_A_SET_ALARM:
+			OLED_invert_rectangle(0, 128, 40, 60);
+			break;
+	}
 }
