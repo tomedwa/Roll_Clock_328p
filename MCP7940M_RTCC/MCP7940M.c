@@ -33,7 +33,6 @@
  * RTC_get_month_name_string() - Get month name as a string.
  * RTC_get_year_int() - Get the year as an integer.
  * RTC_get_year_string() - Get the year as a string.
- * RTC_set_date() - Set the date on the RTCC.
  **************************************************************
 */
 
@@ -336,17 +335,6 @@ void RTC_set_date_day(uint8_t dateDay) {
 }
 
 /*
-* RTC_get_day_date_int()
-* ----------------------
-* Return the current date on the RTCC as an integer.
-*/
-uint8_t RTC_get_day_date_int() {
-	uint8_t dateDayHex = RTC_read_one_register(RTC_DATE_DAY_REGISTER);
-	uint8_t dateDayDec = (((dateDayHex & 0x30) >> 4) * 10) + (dateDayHex & 0x0F);
-	return dateDayDec;
-}
-
-/*
 * RTC_get_date_day_string()
 * -------------------------
 * Return the current date on the RTCC as a string. To do this the value
@@ -356,7 +344,8 @@ uint8_t RTC_get_day_date_int() {
 */
 char* RTC_get_date_day_string() {
 	static char dateDayString[3];
-	uint8_t dateDayDec = RTC_get_day_date_int();
+	uint8_t dateDayHex = RTC_read_one_register(RTC_DATE_DAY_REGISTER);
+	uint8_t dateDayDec = (((dateDayHex & 0x30) >> 4) * 10) + (dateDayHex & 0x0F);
 	snprintf(dateDayString, sizeof(dateDayString), "%d", dateDayDec);
 	return dateDayString;
 }
@@ -482,16 +471,4 @@ char* RTC_get_year_string() {
 	static char yearString[3];
 	snprintf(yearString, sizeof(yearString), "%d", year);
 	return yearString;
-}
-
-/*
-* RTC_set_date()
-* --------------
-* Set the date on the RTCC.
-*/
-void RTC_set_date(uint8_t day, uint8_t dayDate, uint8_t month, uint8_t year) {
-	RTC_set_weekday(day);
-	RTC_set_date_day(dayDate);
-	RTC_set_month(month);
-	RTC_set_year(year);
 }

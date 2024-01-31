@@ -41,10 +41,10 @@
 
 #include "SH1106.h"
 #include "../pFleury_i2c_stuff/i2cmaster.h"
-#include "XBM Fonts/XBM_FONT_8.h"
-#include "XBM Fonts/XBM_FONT_16.h"
-#include "XBM Fonts/XBM_FONT_NUMBERS_20.h"
-#include "XBM Fonts/XBM_FONT_NUMBERS_25.h"
+#include "XBM_fonts/XBM_FONT_8.h"
+#include "XBM_fonts/XBM_FONT_16.h"
+#include "XBM_fonts/XBM_FONT_NUMBERS_20.h"
+#include "XBM_fonts/XBM_FONT_NUMBERS_25.h"
 
 /*
 *	OLED_init()
@@ -52,6 +52,7 @@
 *	Initialise the OLED display by sending a series of initialisation commands to the screen.
 */
 void OLED_init() {
+	i2c_init();
 	uint8_t initCommands[] = {
 		OLED_DISPLAY_OFF,
 		OLED_MUX_RATIO, 0x3F,						// Multiplex ratio 1/64 duty cycle
@@ -64,9 +65,21 @@ void OLED_init() {
 		OLED_PRE_CHARGE_PERIOD, 0xF1,				// Set pre-charge period, Phase 1 period = 15, Phase 2 period = 1
 		OLED_VCOMH_DESELECT_LEVEL, 0x40,			// Set VCOMH deselect level, VCOMH deselect level = 0.77 * VCC
 		OLED_ENTIRE_DISPLAY_NORMAL,					// Show all pixels not just the ones that are on
+		OLED_NORMAL_DISPLAY_COMMAND,
 		OLED_DISPLAY_ON	
 	};
-	OLED_multiple_command(initCommands, 18);
+	OLED_multiple_command(initCommands, 19);
+}
+
+void OLED_display_invert(uint8_t invert) {
+	switch(invert) {
+		case 0:
+			OLED_single_command(OLED_NORMAL_DISPLAY_COMMAND);
+			break;
+		case 1:
+			OLED_single_command(OLED_INVERT_DISPLAY_COMMAND);
+			break;
+	}
 }
 
 /*	
@@ -80,6 +93,7 @@ void OLED_init() {
 			for an invalid command.
 */ 
 void OLED_single_command(uint8_t command) {
+	i2c_set_bitrate(OLED_I2C_BITRATE);
 	i2c_start_wait(OLED_ADDR << 1);	
 	i2c_write(OLED_COMMAND_MODE);	
 	i2c_write(command);
@@ -101,6 +115,7 @@ void OLED_single_command(uint8_t command) {
 			for invalid commands.
 */
 void OLED_multiple_command(uint8_t commands[], uint8_t numOfCommands) {
+	i2c_set_bitrate(OLED_I2C_BITRATE);
 	i2c_start_wait(OLED_ADDR << 1);	
 	i2c_write(OLED_COMMAND_MODE);	
 	for (uint8_t i = 0; i < numOfCommands; i++) {
@@ -130,6 +145,7 @@ void OLED_clear_buffer() {
 *	byte: The byte of data to be sent to the OLED display.
 */
 void OLED_send_byte(uint8_t byte) {
+	i2c_set_bitrate(OLED_I2C_BITRATE);
 	i2c_start_wait(OLED_ADDR << 1);
 	i2c_write(OLED_DATA_MODE);		
 	i2c_write(byte);
@@ -414,6 +430,8 @@ void OLED_xbm_font_25_to_buffer(char* string, uint8_t xPosition, uint8_t yPositi
 	for (uint8_t i = 0; i < indexNumSize; i++) {
 		if ((string[i] >= '0') && (string[i] <= '9')) {
 			indexNums[i] = (uint8_t)(string[i] - 48);
+		} else if (string[i] == ':') {
+			indexNums[i] = 10;
 		}
 	}
 	

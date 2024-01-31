@@ -101,6 +101,8 @@
  */
 extern void i2c_init(void);
 
+extern void i2c_set_bitrate(uint32_t bitrate);
+
 
 /** 
  @brief Terminates the data transfer and releases the I2C bus 

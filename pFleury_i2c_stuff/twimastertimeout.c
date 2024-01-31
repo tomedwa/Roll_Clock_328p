@@ -23,7 +23,7 @@
 #endif
 
 /* I2C clock in Hz */
-#define SCL_CLOCK  100000L
+#define SCL_CLOCK  400000L
 
 /* I2C timer max delay */
 #define I2C_TIMER_DELAY 0xFF
@@ -39,6 +39,14 @@ void i2c_init(void)
   TWBR = ((F_CPU/SCL_CLOCK)-16)/2;  /* must be > 10 for stable operation */
 
 }/* i2c_init */
+
+void i2c_set_bitrate(uint32_t bitrate) {
+	TWCR &= ~(1 << TWEN);	/* Disable twi */
+	TWSR = 0;                         /* no prescaler */
+	TWBR = ((F_CPU/bitrate)-16)/2;  /* must be > 10 for stable operation */
+	TWCR |= (1 << TWEN); /* enable twi */
+}
+
 
 /*************************************************************************	
   Issues a start condition and sends address and transfer direction.

@@ -33,7 +33,6 @@
  * RTC_get_month_name_string() - Get month name as a string.
  * RTC_get_year_int() - Get the year as an integer.
  * RTC_get_year_string() - Get the year as a string.
- * RTC_set_date() - Set the date on the RTCC.
  **************************************************************
 */
 
@@ -98,11 +97,9 @@ void RTC_set_weekday(uint8_t day);
 void RTC_set_date_day(uint8_t dateDay);
 void RTC_set_month(uint8_t month);
 void RTC_set_year(uint8_t year);
-void RTC_set_date(uint8_t day, uint8_t dayDate, uint8_t month, uint8_t year);
 
 uint8_t RTC_get_weekday_int();
 char* RTC_get_weekday_string();
-uint8_t RTC_get_day_date_int();
 char* RTC_get_date_day_string();
 uint8_t RTC_get_month_int();
 char* RTC_get_month_num_string();

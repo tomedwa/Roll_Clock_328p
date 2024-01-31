@@ -41,6 +41,8 @@
 #define OLED_WIDTH	128
 #define OLED_HEIGHT	64
 
+#define OLED_I2C_BITRATE 450000L
+
 #define OLED_CLOCKWISE_0	0
 #define OLED_CLOCKWISE_90	1
 #define OLED_CLOCKWISE_180	2
@@ -68,6 +70,8 @@
 #define OLED_SET_LOWER_COLUMN_ADDR			0x00
 #define OLED_SET_HIGHER_COLUMN_ADDR			0x10
 #define OLED_SET_PAGE_ADDR					0xB0
+#define OLED_NORMAL_DISPLAY_COMMAND			0xA6
+#define OLED_INVERT_DISPLAY_COMMAND			0xA7
 
 uint8_t OLED_BUFFER[OLED_HEIGHT / 8][OLED_WIDTH]; // Used to store the pixel data for the OLED display.
 
@@ -96,5 +100,6 @@ void OLED_draw_horizontal_line(uint8_t xStart, uint8_t xEnd, uint8_t yPosition);
 void OLED_draw_vertical_line(uint8_t yStart, uint8_t yEnd, uint8_t xPosition);
 void OLED_draw_rectangle(uint8_t xPosition, uint8_t yPosition, uint8_t width, uint8_t height, uint8_t filled);
 void OLED_draw_circle(uint8_t xCenter, uint8_t yCenter, uint8_t radius, uint8_t filled);
+void OLED_display_invert(uint8_t invert);
 
 #endif /* SH1106_H_ */

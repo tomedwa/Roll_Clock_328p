@@ -23,7 +23,6 @@
 
 #include <avr/io.h>
 #include <stdio.h>
-#include <avr/interrupt.h>
 #include "ADXL343.h"
 
 #ifdef ADXL343_SPI_MODE
@@ -52,7 +51,7 @@ void ADXL343_setup_axis_read() {
 	#else
 		/* I2C Comms */
 		i2c_init();
-		
+		i2c_set_bitrate(ADXL343_I2C_BITRATE);
 		i2c_start_wait(I2C_WRITE_ADDR);
 		i2c_write(BW_RATE);
 		i2c_write(0x0D);
@@ -88,9 +87,6 @@ void ADXL343_update_axis_readings() {
 	uint8_t x0, x1;
 	uint8_t y0, y1;
 	int32_t x, y, z;
-	uint8_t interruptsOn = bit_is_set(SREG, SREG_I);
-	
-	cli();	/* Disable interrupts */
 	
 	#ifdef ADXL343_SPI_MODE
 		/* SPI Comms */
@@ -103,10 +99,6 @@ void ADXL343_update_axis_readings() {
 		z0 = A328p_SPI_receive_data_only();
 		z1 = A328p_SPI_receive_data_only();
 		SS_HIGH;
-		
-		if(interruptsOn) {
-			sei(); /* Re-enable interrupts */
-		}
 	
 		// Combine all accelerometer data into integers
 		x = (x1 << 8) | x0;
@@ -116,10 +108,11 @@ void ADXL343_update_axis_readings() {
 		adxl_axis_readings[0] = x;
 		adxl_axis_readings[1] = y;
 		adxl_axis_readings[2] = z;
-		
+	
 		return;
 	#else
 		/* I2C Comms */
+		i2c_set_bitrate(ADXL343_I2C_BITRATE);
 		i2c_start_wait(0xA6);
 		i2c_write(X_DATA_0);
 		i2c_rep_start(0xA7);
@@ -130,10 +123,6 @@ void ADXL343_update_axis_readings() {
 		z0 = i2c_readAck();
 		z1 = i2c_readNak();
 		i2c_stop();
-		
-		if(interruptsOn) {
-			sei(); /* Re-enable interrupts */
-		}
 		
 		// Combine all accelerometer data into integers
  		x = (x1 << 8) | x0;

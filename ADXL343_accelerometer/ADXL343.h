@@ -30,6 +30,7 @@
 #define I2C_ADDR	0x53 // Alt address pin low.
 #define I2C_READ_ADDR	(I2C_ADDR << 1) | 1
 #define I2C_WRITE_ADDR	(I2C_ADDR << 1) | 0
+#define ADXL343_I2C_BITRATE 400000L
 
 #define SPI_READ		(1 << 7)
 #define SPI_WRITE		(0 << 7)
