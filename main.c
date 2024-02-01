@@ -102,13 +102,16 @@ void settings_change_date(uint8_t settingsModeA_setDate_selectedDigit, uint8_t* 
 void settings_mode_A_set_date_inverted_rectangle(uint8_t settingsModeA_setDate_selectedDigit, int8_t settingsModeA_setDate_digitOrder_index[9]);
 void settings_mode_A_change_date_digits(char tempSettingsDate[9], uint8_t* settingsModeA_increaseDigit, uint8_t settingsModeA_setDate_selectedDigit, int8_t settingsModeA_setDate_digitOrder_index[9]);
 void settings_mode_A_confirm_date_change(char tempSettingsDate[9]);
+void settings_mode_A_change_alarm_time(uint8_t settingsModeA_selectedDigit, uint8_t* settingsModeA_increaseDigit, char tempSettingsTime[9]);
+void settings_mode_A_set_temp_alarm_time(char tempSettingsTime[9]);
+void settings_mode_A_confirm_alarm_time_change(char tempSettingsTime[9]);
 
 int main(void) {
 	hardware_init();
 	RTC_alarm_enable_disable(RTC_ALARM_ENABLED);
 	
-	RTC_set_time(0x23, 0x59, 0x55); // user needs to be able to change this
-	RTC_set_alarm_time(0, 0, 5);
+	RTC_set_time(0x23, 0x59, 0x55);
+	RTC_set_alarm_time(0x00, 0x00, 0x05);
 	RTC_set_weekday(1);
 	RTC_set_date(0x31, 0x12, 0x98);
 	
@@ -178,9 +181,7 @@ int main(void) {
 					} else if (settingsModeA_mainScreenSelection == SETTINGS_MODE_A_SET_DATE) {
 						settings_change_date(settingsModeA_setDate_selectedDigit, &settingsModeA_increaseDigit, tempSettingsDate, settingsModeA_setDate_digitOrder_index);
 					} else if (settingsModeA_mainScreenSelection == SETTINGS_MODE_A_SET_ALARM) {
-						OLED_clear_buffer();
-						OLED_draw_string("set alarm", 0, 0, 8, 1, MODE_A);
-						OLED_display_buffer();
+						settings_mode_A_change_alarm_time(settingsModeA_selectedDigit, &settingsModeA_increaseDigit, tempSettingsTime);
 					}
 				}
 				break;
@@ -220,6 +221,8 @@ int main(void) {
 					set_temp_settings_time(tempSettingsTime);
 				} else if (settingsModeA_mainScreenSelection == SETTINGS_MODE_A_SET_DATE) {
 					set_temp_settings_date(tempSettingsDate);
+				} else if (settingsModeA_mainScreenSelection == SETTINGS_MODE_A_SET_ALARM) {
+					settings_mode_A_set_temp_alarm_time(tempSettingsTime);
 				}
 				
 				settingsModeA_mainScreenHighlight = SETTINGS_MODE_A_SET_TIME;
@@ -257,8 +260,19 @@ int main(void) {
 				}
 				
 			} else if (settingsModeA_mainScreenSelection == SETTINGS_MODE_A_SET_ALARM) {
-				settingsMode = SETTINGS_MODE_INACTIVE;
-				settingsModeA_mainScreenSelection = SETTINGS_MODE_A_IDLE;
+				
+				if (settingsModeA_selectedDigit == TIME_STRING_INDEX_SECONDS_ONES) {
+					settingsModeA_selectedDigit = TIME_STRING_INDEX_HOURS_TENS;
+					settingsMode = SETTINGS_MODE_INACTIVE;
+					settingsModeA_mainScreenSelection = SETTINGS_MODE_A_IDLE;
+					settingsModeA_increaseDigit = SETTINGS_MODE_A_HOLD_DIGIT;
+					settings_mode_A_confirm_alarm_time_change(tempSettingsTime);
+				} else {
+					settingsModeA_selectedDigit++;
+					if ((settingsModeA_selectedDigit == 2) || (settingsModeA_selectedDigit == 5)) {
+						settingsModeA_selectedDigit++;
+					}
+				}
 			}
 			
 		}
@@ -274,6 +288,8 @@ int main(void) {
 				} else if (settingsModeA_mainScreenSelection == SETTINGS_MODE_A_SET_TIME) {
 					settingsModeA_increaseDigit = SETTINGS_MODE_A_INCREASE_DIGIT;
 				} else if (settingsModeA_mainScreenSelection == SETTINGS_MODE_A_SET_DATE) {
+					settingsModeA_increaseDigit = SETTINGS_MODE_A_INCREASE_DIGIT;
+				} else if (settingsModeA_mainScreenSelection == SETTINGS_MODE_A_SET_ALARM) {
 					settingsModeA_increaseDigit = SETTINGS_MODE_A_INCREASE_DIGIT;
 				}
 			}	
@@ -538,6 +554,7 @@ void settings_increase_time(char tempSettingsTime[9], uint8_t* settingsModeA_inc
 	}
 	
 	uint8_t tempNum = 0;
+	uint8_t tempNum2 = 0;
 	
 	if (settingsModeA_selectedDigit == TIME_STRING_INDEX_HOURS_TENS) {
 		tempNum = tempSettingsTime[settingsModeA_selectedDigit] - 48;
@@ -547,6 +564,27 @@ void settings_increase_time(char tempSettingsTime[9], uint8_t* settingsModeA_inc
 			tempNum++;
 			tempSettingsTime[settingsModeA_selectedDigit] = tempNum + 48;
 		}
+		
+	} else if (settingsModeA_selectedDigit == TIME_STRING_INDEX_HOURS_ONES) {
+		tempNum = tempSettingsTime[TIME_STRING_INDEX_HOURS_ONES] - 48;
+		tempNum2 = tempSettingsTime[TIME_STRING_INDEX_HOURS_TENS] - 48;
+		
+		if (tempNum2 == 2) {
+			if (tempNum == 3) {
+				tempSettingsTime[TIME_STRING_INDEX_HOURS_ONES] = '0';
+			} else {
+				tempNum++;
+				tempSettingsTime[TIME_STRING_INDEX_HOURS_ONES] = tempNum + 48;
+			}
+		} else {
+			if (tempNum == 9) {
+				tempSettingsTime[TIME_STRING_INDEX_HOURS_ONES] = '0';
+			} else {
+				tempNum++;
+				tempSettingsTime[TIME_STRING_INDEX_HOURS_ONES] = tempNum + 48;
+			}
+		}
+	
 	} else {
 		tempNum = tempSettingsTime[settingsModeA_selectedDigit] - 48;
 		if (tempNum == 9) {
@@ -626,7 +664,7 @@ void settings_mode_A_change_date_digits(char tempSettingsDate[9], uint8_t* setti
 	
 	uint8_t year = ((tempSettingsDate[DATE_STRING_INDEX_YEAR_TENS] - 48) * 10) + (tempSettingsDate[DATE_STRING_INDEX_YEAR_ONES] - 48);
 	uint8_t month = ((tempSettingsDate[DATE_STRING_INDEX_MONTH_TENS] - 48) * 10) + (tempSettingsDate[DATE_STRING_INDEX_MONTH_ONES] - 48);;
-	uint8_t day = ((tempSettingsDate[DATE_STRING_INDEX_DAY_TENS] - 48) * 10) + (tempSettingsDate[DATE_STRING_INDEX_DAY_ONES] - 48);;
+	//uint8_t day = ((tempSettingsDate[DATE_STRING_INDEX_DAY_TENS] - 48) * 10) + (tempSettingsDate[DATE_STRING_INDEX_DAY_ONES] - 48);;
 	uint8_t leapYear = 0;
 	uint8_t tempDigit = 0;
 	uint8_t tempDigit2 = 0;
@@ -779,4 +817,31 @@ void settings_mode_A_confirm_date_change(char tempSettingsDate[9]) {
 	uint8_t month = ((tempSettingsDate[3] - 48) << 4) | (tempSettingsDate[4] - 48);
 	uint8_t year = ((tempSettingsDate[6] - 48) << 4) | (tempSettingsDate[7] - 48);
 	RTC_set_date(day, month, year);
+}
+
+void settings_mode_A_change_alarm_time(uint8_t settingsModeA_selectedDigit, uint8_t* settingsModeA_increaseDigit, char tempSettingsTime[9]) {
+	OLED_clear_buffer();
+	OLED_draw_string("Set Alarm", 16, 7, 16, 2, MODE_A);
+	settings_increase_time(tempSettingsTime, settingsModeA_increaseDigit, settingsModeA_selectedDigit);
+	OLED_draw_string(tempSettingsTime, 6, 33, 25, 5, MODE_A);
+	
+	change_time_settings_inverted_rectange_position(settingsModeA_selectedDigit);
+	
+	OLED_display_buffer();
+}
+
+void settings_mode_A_set_temp_alarm_time(char tempSettingsTime[9]) {
+	char currentAlarmTime[9];
+	RTC_get_alarm_time_string(currentAlarmTime);
+	for (uint8_t i = 0; i < 9; i++) {
+		tempSettingsTime[i] = currentAlarmTime[i];
+	}
+}
+
+void settings_mode_A_confirm_alarm_time_change(char tempSettingsTime[9]) {
+	uint8_t hours = ((tempSettingsTime[0] - 48) << 4) | (tempSettingsTime[1] - 48);
+	uint8_t minutes = ((tempSettingsTime[3] - 48) << 4) | (tempSettingsTime[4] - 48);
+	uint8_t seconds = ((tempSettingsTime[6] - 48) << 4) | (tempSettingsTime[7] - 48);
+	
+	RTC_set_alarm_time(hours, minutes, seconds);
 }

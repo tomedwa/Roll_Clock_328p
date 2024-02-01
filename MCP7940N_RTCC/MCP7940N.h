@@ -117,5 +117,6 @@ void RTC_get_date_string(char string[9]);
 uint8_t RTC_get_alarm_time_seconds_int();
 uint8_t RTC_get_alarm_time_minutes_int();
 uint8_t RTC_get_alarm_time_hours_int();
+void RTC_get_alarm_time_string(char string[9]);
 
 #endif /* MCP7940M_H_ */

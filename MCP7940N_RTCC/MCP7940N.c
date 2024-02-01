@@ -146,9 +146,6 @@ uint8_t RTC_get_time_hours_int() {
 	return ( _currentTime[4] * 10 ) + _currentTime[5];
 }
 
-uint8_t RTC_get_time_minutes_int();
-uint8_t RTC_get_time_hours_int();
-
 void RTC_get_time_string(char string[9]) {
 	string[0] = _currentTime[4] + 48;
 	string[1] = _currentTime[5] + 48;
@@ -423,21 +420,15 @@ void RTC_set_alarm_time(uint8_t hours, uint8_t minutes, uint8_t seconds) {
 }
 
 uint8_t RTC_get_alarm_time_seconds_int() {
-	uint8_t returnValue;
-	returnValue = ((_alarmTime[0] / 10) << 4) | (_alarmTime[0] & 0x0F);
-	return returnValue;
+	return _alarmTime[0];
 }
 
 uint8_t RTC_get_alarm_time_minutes_int() {
-	uint8_t returnValue;
-	returnValue = ((_alarmTime[1] / 10) << 4) | (_alarmTime[1] & 0x0F);
-	return returnValue;
+	return _alarmTime[1];
 }
 
 uint8_t RTC_get_alarm_time_hours_int() {
-	uint8_t returnValue;
-	returnValue = ((_alarmTime[2] / 10) << 4) | (_alarmTime[2] & 0x0F);
-	return returnValue;
+	return _alarmTime[2];
 }
 
 uint8_t RTC_check_alarm_match() {
@@ -468,5 +459,17 @@ void RTC_get_date_string(char string[9]) {
 	string[5] = '-';
 	string[6] = (year / 10) + 48;
 	string[7] = (year % 10) + 48;
+	string[8] = '\0';
+}
+
+void RTC_get_alarm_time_string(char string[9]) {
+	string[0] = (_alarmTime[2] / 10) + 48;
+	string[1] = (_alarmTime[2] % 10) + 48;
+	string[2] = ':';
+	string[3] = (_alarmTime[1] / 10) + 48;
+	string[4] = (_alarmTime[1] % 10) + 48;
+	string[5] = ':';
+	string[6] = (_alarmTime[0] / 10) + 48;
+	string[7] = (_alarmTime[0] % 10) + 48;
 	string[8] = '\0';
 }
