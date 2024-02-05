@@ -106,7 +106,7 @@ void MODE_A_control() {
 * ------------------------
 * Private function used to display the current date and time.
 */
-void _display_date_and_time() {
+static void _display_date_and_time() {
 	char currentTime[9];
 	char dayDateString[9];
 	
@@ -136,7 +136,7 @@ void _display_date_and_time() {
 * Private function to display the settings menu. The menu options 
 * are Set Time, Set Date, and Set Alarm.
 */
-void _display_settings_menu() {
+static void _display_settings_menu() {
 	
 	OLED_clear_buffer();
 	OLED_draw_string("Set Time", 6, 2, 16, 2, MODE_A);
@@ -152,7 +152,7 @@ void _display_settings_menu() {
 * Private function to highlight the menu option the user is currently
 * looking at. Highlight = Invert the section of the OLED display.
 */
-void _menu_highlight_option() {
+static void _menu_highlight_option() {
 	
 	switch(_menuHighlight) {
 		case MODE_A_SETTINGS_SELECTION_SET_TIME:
@@ -176,7 +176,7 @@ void _menu_highlight_option() {
 * selecting options in the menu and confirming changes made when setting
 * the time, date and alarm time.
 */
-void _button_select_logic() {
+static void _button_select_logic() {
 	if (!!(PINC & (1 << 1))) {
 		if (_settingsModeStatus == MODE_A_SETTINGS_OFF) {
 			_settingsModeStatus = MODE_A_SETTINGS_ON;
@@ -211,7 +211,7 @@ void _button_select_logic() {
 * options in the menu and changing the values of the selected digits when setting the
 * time, date or alarm time.
 */
-void _button_next_logic() {
+static void _button_next_logic() {
 	if (!!(PIND & (1 << 6))) {
 		if (_menuSelection == MODE_A_SETTINGS_SELECTION_NONE) {
 			_menuHighlight = (_menuHighlight + 1) % 3;
@@ -226,7 +226,7 @@ void _button_next_logic() {
 * -------------------
 * Private function used to display the set time section of the settings.
 */
-void _display_set_time() {
+static void _display_set_time() {
 	_increase_selected_time_digit();
 	OLED_clear_buffer();
 	OLED_draw_string("Set Time", 21, 7, 16, 2, MODE_A);
@@ -243,7 +243,7 @@ void _display_set_time() {
 * when setting a new time. Initialised with 00-00-00 when setting a new date. And initialised
 * with the current alarm time when setting a new alarm time.
 */
-void _string_init() {
+static void _string_init() {
 	switch(_menuSelection) {
 		
 		case MODE_A_SETTINGS_SELECTION_SET_TIME:
@@ -274,7 +274,7 @@ void _string_init() {
 * -------------------------------
 * Private function for changing the selected digit in the time or alarm time. 
 */
-void _increase_selected_time_digit() {
+static void _increase_selected_time_digit() {
 	if (_digitIncrementFlag == MODE_A_SETTINGS_HOLD_DIGIT) {
 		return;
 	}
@@ -332,7 +332,7 @@ void _increase_selected_time_digit() {
 * Private function to highlight the currently selected digit when
 * setting the time, date or alarm time.
 */
-void _selected_digit_highlight() {
+static void _selected_digit_highlight() {
 	
 	if ((_menuSelection == MODE_A_SETTINGS_SELECTION_SET_TIME) || (_menuSelection == MODE_A_SETTINGS_SELECTION_SET_ALARM)) {
 		switch(_selectedDigit) {
@@ -391,7 +391,7 @@ void _selected_digit_highlight() {
 * -----------------
 * Private string to confirm the changes made when setting the time, date or alarm time. 
 */
-void _string_confirm() {
+static void _string_confirm() {
 	uint8_t temp1;
 	uint8_t temp2;
 	uint8_t temp3;
@@ -430,7 +430,7 @@ void _string_confirm() {
 * --------------------
 * Private function to display the set alarm section of the settings.
 */
-void _display_set_alarm() {
+static void _display_set_alarm() {
 	_increase_selected_time_digit();
 	OLED_clear_buffer();
 	OLED_draw_string("Set Alarm", 16, 7, 16, 2, MODE_A);
@@ -444,7 +444,7 @@ void _display_set_alarm() {
 * -------------------
 * Private function to display the set date section of the settings.
 */
-void _display_set_date() {
+static void _display_set_date() {
 	_increase_selected_date_digit();
 	OLED_clear_buffer();
 	OLED_draw_string("Set Date", 19, 7, 16, 2, MODE_A);
@@ -458,7 +458,7 @@ void _display_set_date() {
 * -------------------------------
 * Private function for changing the selected digit when setting the date.
 */
-void _increase_selected_date_digit() {
+static void _increase_selected_date_digit() {
 	if (_digitIncrementFlag == MODE_A_SETTINGS_HOLD_DIGIT) {
 		return;
 	}

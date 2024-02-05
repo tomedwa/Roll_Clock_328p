@@ -27,6 +27,7 @@
 #include "AM2320_temperature_humidity/AM2320_temperature_humidity.h"
 #include "piezo_buzzer_328p/piezo_buzzer_328p.h"
 #include "roll_clock_modes/MODE_A.h"
+#include "roll_clock_modes/MODE_B.h"
 
 /* Defines for keeping track of delays */
 #define NUM_PREVIOUS_TIMES 5
@@ -46,7 +47,6 @@
 #define AXIS_INACTIVE 500
 
 /* Different modes based on display orientation */
-#define MODE_B 0x01
 #define MODE_C 0x02
 #define MODE_D 0x03
 
@@ -61,8 +61,6 @@ uint8_t update_current_orientation(uint8_t lastOrientation);
 void update_ADXL_data(uint32_t currentTime, uint32_t* previousTimes, uint8_t* lastOrientation, uint8_t* currentOrientation);
 void update_rtc_current_time(uint32_t currentTime, uint32_t* previousTimes);
 void update_temp_humidity_sensor(uint32_t currentTime, uint32_t* previousTimes);
-void display_date_and_time();
-void display_temp_humidity();
 void alarm_match_handling(uint32_t currentTime, uint32_t* previousTimes, uint8_t* displayInvertedStatus);
 
 int main(void) {
@@ -92,13 +90,9 @@ int main(void) {
 	buzzer_set_frequency(444);
 	buzzer_stop_tone();
 	
-
-	
-	
 	/* Not permanent solution */
 	DDRC &= ~(1 << 4); // Alarm off
 
-	
     while (1) {
 		/* Update current system time */
 		currentTime = timer0_get_current_time(); 
@@ -122,7 +116,12 @@ int main(void) {
 			case MODE_B:
 				/* Update the temperature and humidity readings from AM2320 sensor */
 				update_temp_humidity_sensor(currentTime, previousTimes);
-				display_temp_humidity();
+				
+				/*
+				Mode B controls the display of the current readings for temperature
+				and humidity.
+				*/
+				MODE_B_control();
 				break;
 			case MODE_C:
 				OLED_clear_buffer();
@@ -197,30 +196,6 @@ uint8_t update_current_orientation(uint8_t lastOrientation) {
 	return currentOrientation;
 }
 
-
-
-
-void display_temp_humidity() {
-	char temperatureString[7];
-	char humidityString[5];
-	char degreesCelsiusString[2] = {254, '\0'};
-	
-	AM2320_get_temperature_string_celsius(temperatureString);
-	AM2320_get_humidity_string(humidityString);
-	
-	OLED_clear_buffer();
-	
-	OLED_draw_string("Temperature", 0, 16, 8, 1, MODE_B);
-	OLED_draw_string(temperatureString, 0, 32, 16, 2, MODE_B);
-	OLED_draw_string(degreesCelsiusString, 44, 32, 16, 1, MODE_B);
-	
-	OLED_draw_string("Humidity", 0, 80, 8, 1, MODE_B);
-	OLED_draw_string(humidityString, 0, 96, 16, 2, MODE_B);
-	OLED_draw_string("%", 49, 96, 16, 1, MODE_B);
-	
-	OLED_display_buffer();
-}
-
 /*
 * update_ADXL_data()
 * ----------------
@@ -250,6 +225,11 @@ void initialise_current_and_previous_times(uint32_t* currentTime, uint32_t* prev
 	}
 }
 
+/*
+* update_rtc_current_time()
+* --------------------------
+* Update the current time on the RTC at a regular interval.
+*/
 void update_rtc_current_time(uint32_t currentTime, uint32_t* previousTimes) {
 
 	if ((currentTime - previousTimes[RTC_UPDATE_CURRENT_TIME_INDEX]) > RTC_UPDATE_CURRENT_TIME_INTERVAL) {
@@ -259,6 +239,11 @@ void update_rtc_current_time(uint32_t currentTime, uint32_t* previousTimes) {
 	
 }
 
+/*
+* update_temp_humidity_sensor()
+* -----------------------------
+* Update the current readings of the temperature and humidity sensor at a regular interval.
+*/
 void update_temp_humidity_sensor(uint32_t currentTime, uint32_t* previousTimes) {
 	if ((currentTime - previousTimes[AM2320_UPDATE_READINGS_INDEX]) > AM2320_UPDATE_READINGS_INTERVAL) {
 		AM2320_update_temperature_humidity();
@@ -266,6 +251,12 @@ void update_temp_humidity_sensor(uint32_t currentTime, uint32_t* previousTimes) 
 	}
 }
 
+/*
+* alarm_match_handling()
+* -----------------------
+* When there is a match in the current time and the alarm time the screen must invert and return to normal
+* every second.
+*/
 void alarm_match_handling(uint32_t currentTime, uint32_t* previousTimes, uint8_t* displayInvertedStatus) {
 	/* Check if the alarm is activated and invert the display if necessary */
 	if (RTC_check_alarm_match() == RTC_ALARM_ACTIVE) {
