@@ -17,6 +17,10 @@
 #include <avr/io.h>
 #include <stdio.h>
 #include <avr/pgmspace.h>
+#include <avr/interrupt.h>
+
+#define F_CPU 16000000L	/* Clock frequency of CPU */
+#include <util/delay.h>
 
 #include "MODE_A.h"
 #include "../MCP7940N_RTCC/MCP7940N.h"
@@ -41,6 +45,9 @@ The '-1' values indicate the positions of non-integer characters in the _setting
 (e.g., the colons in HH:MM:SS).
 */
 static const int8_t _dateDigitsIndexOffset[8] = {6, 7, -1, 3, 4, -1, 0, 1};
+	
+static uint8_t _selectPress; /* Signals when the select button has been pressed */
+static uint8_t _nextPress; /* Signals when the next button has been pressed */
 
 /* Private function prototypes */
 static void _display_date_and_time();
@@ -71,8 +78,45 @@ void MODE_A_init() {
 	_selectedDigit = MODE_A_STRING_INDEX_LEFT_TENS;
 	_digitIncrementFlag = MODE_A_SETTINGS_HOLD_DIGIT;
 	
-	DDRC &= ~(1 << 1); /* Select Button */
-	DDRD &= ~(1 << 6); /* Next/Increase button */
+	_selectPress = MODE_A_BUTTON_RELEASED;
+	_nextPress = MODE_A_BUTTON_RELEASED;
+	
+	/* Set PD2 (INT0) and PD3 (INT1) as input with pull-down resistor enabled */
+	DDRD &= ~((1 << 2) | (1 << 3));
+	PORTD &= ~((1 << 2) | (1 << 3));
+	
+	/* Enable external interrupts INT0 and INT1 */
+	EICRA |= (1 << ISC00) | (1 << ISC01) | (1 << ISC10) | (1 << ISC11); /* Rising edge triggers interrupts for INT0 and INT1 */
+	EIMSK |= (1 << INT0) | (1 << INT1);   /* Enable INT0 and INT1 interrupts */
+	
+	// Enable global interrupts
+	sei();
+}
+
+ISR(INT0_vect) {
+	/* Disable further interrupts on INT0 */
+	EIMSK &= ~(1 << INT0);
+	
+	/* Wait for short debounce period */
+	_delay_ms(10);
+		
+	_selectPress = 1;
+
+	 /* Re-enable interrupts on INT0 */
+	 EIMSK |= (1 << INT0);
+}
+
+ISR(INT1_vect) {
+	/* Disable further interrupts on INT1 */
+	EIMSK &= ~(1 << INT1);
+	
+	/* Wait for debounce period */
+	_delay_ms(10); 
+	
+	_nextPress = 1;
+
+	/* Re-enable interrupts on INT1 */
+	EIMSK |= (1 << INT1);
 }
 
 /*
@@ -82,8 +126,20 @@ void MODE_A_init() {
 */
 void MODE_A_control() {
 	
-	_button_select_logic();
-	_button_next_logic();
+	/* If an interrupt for the select button is detected or if 
+	the select button has been held down */
+	if (_selectPress == 1 || (PIND & (1 << 2))) {
+		_selectPress = 0;
+		_button_select_logic();
+	}
+	
+	/* If an interrupt for the next button is detected or if 
+	the next button has been held down */
+	if (_nextPress == 1 || (PIND & (1 << 3))) {
+		_nextPress = 0;
+		_button_next_logic();
+	}
+	
 	
 	if (_settingsModeStatus == MODE_A_SETTINGS_OFF) {
 		_display_date_and_time();
@@ -177,28 +233,26 @@ static void _menu_highlight_option() {
 * the time, date and alarm time.
 */
 static void _button_select_logic() {
-	if (!!(PINC & (1 << 1))) {
-		if (_settingsModeStatus == MODE_A_SETTINGS_OFF) {
-			_settingsModeStatus = MODE_A_SETTINGS_ON;
+	if (_settingsModeStatus == MODE_A_SETTINGS_OFF) {
+		_settingsModeStatus = MODE_A_SETTINGS_ON;
 		} else if (_menuSelection == MODE_A_SETTINGS_SELECTION_NONE) {
-			_menuSelection = _menuHighlight;
+		_menuSelection = _menuHighlight;
+		_menuHighlight = MODE_A_SETTINGS_SELECTION_SET_TIME;
+		_string_init();
+	} else if (	(_menuSelection == MODE_A_SETTINGS_SELECTION_SET_TIME)	||
+				(_menuSelection == MODE_A_SETTINGS_SELECTION_SET_ALARM) ||
+				(_menuSelection == MODE_A_SETTINGS_SELECTION_SET_DATE)) {
+		if (_selectedDigit == MODE_A_STRING_INDEX_RIGHT_ONES) {
+			_string_confirm();
+			_menuSelection = MODE_A_SETTINGS_SELECTION_NONE;
+			_selectedDigit = MODE_A_STRING_INDEX_LEFT_TENS;
+			_digitIncrementFlag = MODE_A_SETTINGS_HOLD_DIGIT;
 			_menuHighlight = MODE_A_SETTINGS_SELECTION_SET_TIME;
-			_string_init();
-		} else if (	(_menuSelection == MODE_A_SETTINGS_SELECTION_SET_TIME)	|| 
-					(_menuSelection == MODE_A_SETTINGS_SELECTION_SET_ALARM) ||
-					(_menuSelection == MODE_A_SETTINGS_SELECTION_SET_DATE)) {
-			if (_selectedDigit == MODE_A_STRING_INDEX_RIGHT_ONES) {
-				_string_confirm();
-				_menuSelection = MODE_A_SETTINGS_SELECTION_NONE;
-				_selectedDigit = MODE_A_STRING_INDEX_LEFT_TENS;
-				_digitIncrementFlag = MODE_A_SETTINGS_HOLD_DIGIT;
-				_menuHighlight = MODE_A_SETTINGS_SELECTION_SET_TIME;
-				_settingsModeStatus = MODE_A_SETTINGS_OFF;
-			} else {
+			_settingsModeStatus = MODE_A_SETTINGS_OFF;
+		} else {
+			_selectedDigit++;
+			if ((_selectedDigit == 2) || (_selectedDigit == 5)) {
 				_selectedDigit++;
-				if ((_selectedDigit == 2) || (_selectedDigit == 5)) {
-					_selectedDigit++;
-				}
 			}
 		}
 	}
@@ -212,7 +266,7 @@ static void _button_select_logic() {
 * time, date or alarm time.
 */
 static void _button_next_logic() {
-	if (!!(PIND & (1 << 6))) {
+	if (_settingsModeStatus == MODE_A_SETTINGS_ON) {
 		if (_menuSelection == MODE_A_SETTINGS_SELECTION_NONE) {
 			_menuHighlight = (_menuHighlight + 1) % 3;
 		} else {
