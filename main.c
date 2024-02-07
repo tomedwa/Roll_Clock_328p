@@ -102,7 +102,7 @@ int main(void) {
 	buzzer_stop_tone();
 	
 	/* Not permanent solution */
-	DDRC &= ~(1 << 4); // Alarm off
+	DDRC &= ~(1 << 3); /* Alarm off */
 
     while (1) {
 		/* Update current system time */
