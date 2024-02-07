@@ -1,5 +1,9 @@
 # Roll_Clock_328p
-wip, update soon
+Decided to revisit a group assignment from uni that I didnt get a great mark for.
+I am redoing pretty much everything from scratch while using the old (bad) code from
+the assignment as reference.
+
+wip, update soon. 
 
 ## Repositories for different components and sections
 | Name | Link |
