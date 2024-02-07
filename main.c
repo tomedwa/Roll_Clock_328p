@@ -28,6 +28,8 @@
 #include "piezo_buzzer_328p/piezo_buzzer_328p.h"
 #include "roll_clock_modes/MODE_A.h"
 #include "roll_clock_modes/MODE_B.h"
+#include "roll_clock_modes/MODE_C.h"
+#include "roll_clock_modes/MODE_D.h"
 
 /* Defines for keeping track of delays */
 #define NUM_PREVIOUS_TIMES 5
@@ -55,7 +57,6 @@
 #define DISPLAY_NORMAL		0x00
 
 /* Function prototypes */
-void hardware_init();
 void initialise_current_and_previous_times(uint32_t* currentTime, uint32_t* previousTimes);
 uint8_t update_current_orientation(uint8_t lastOrientation);
 void update_ADXL_data(uint32_t currentTime, uint32_t* previousTimes, uint8_t* lastOrientation, uint8_t* currentOrientation);
@@ -66,7 +67,17 @@ void alarm_match_handling(uint32_t currentTime, uint32_t* previousTimes, uint8_t
 int main(void) {
 	
 	MODE_A_init();
-	hardware_init();
+	MODE_B_init();
+	
+	i2c_init();					/* i2c for MCU */
+	A328p_SPI_init();			/* SPI for MCU */
+	OLED_init();				/* SH1106 OLED display */
+	timer0_init();				/* Initialise timer0 to generate interrupts every 1ms */
+	RTC_init();					/* Clock IC */
+	USART_init();				/* USART for MCU */
+	ADXL343_setup_axis_read();	/* Using i2c mode */
+	buzzer_init();
+	sei();	
 	RTC_alarm_enable_disable(RTC_ALARM_ENABLED);
 	
 	RTC_set_time(0x23, 0x59, 0x55);
@@ -135,23 +146,6 @@ int main(void) {
 				break;
 		}
     }
-}
-
-/*
-* hardware_init()
-* ---------------
-* Initialise any hardware for the project here.
-*/
-void hardware_init() {
-	sei();						/* Enable global interrupts */
-	i2c_init();					/* i2c for MCU */
-	A328p_SPI_init();			/* SPI for MCU */
-	OLED_init();				/* SH1106 OLED display */
-	timer0_init();				/* Initialise timer0 to generate interrupts every 1ms */
-	RTC_init();					/* Clock IC */
-	USART_init();				/* USART for MCU */
-	ADXL343_setup_axis_read();	/* Using i2c mode */
-	buzzer_init();
 }
 
 /*

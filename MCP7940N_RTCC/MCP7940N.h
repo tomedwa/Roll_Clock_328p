@@ -1,6 +1,6 @@
 /*
  **************************************************************
- * MCP7940N.h
+ * MCP7940N.c
  * Author: Tom
  * Date: 17/11/2023
  * AVR Library for the real time clock and calendar chip,
@@ -14,10 +14,36 @@
  * RTC_init() - Initialise the RTC.
  * RTC_set_time() - Set the current time on the RTC.
  * RTC_update_current_time() - Get the current time on the RTC.
- * RTC_get_time_string() - Get the current time formatted as a string.
+ * RTC_get_time_seconds_int() - Get time in seconds as integer.
+ * RTC_get_time_minutes_int() - Get time in minutes as integer.
+ * RTC_get_time_hours_int() - Get time in hours as integer.
+ * RTC_get_time_string() - Get current time formatted as a string.
+ * RTC_set_weekday() - Set the weekday on the RTC.
+ * RTC_get_weekday_int() - Get current weekday as integer.
+ * RTC_get_weekday_string() - Get current weekday as a string.
+ * RTC_set_date_day() - Set date of day on RTC.
+ * RTC_get_date_day_string() - Get date of day as string.
+ * RTC_set_month() - Set current month on RTC.
+ * RTC_get_month_int() - Get current month as integer.
+ * RTC_get_month_num_string() - Get current month integer as string.
+ * RTC_get_month_name_string() - Get current month as string.
+ * RTC_set_year() - Set year on RTC.
+ * RTC_get_year_int() - Get the year as an integer.
+ * RTC_get_year_string() - Get year as a string.
+ * RTC_set_date() - Set the current date on the RTC.
+ * RTC_alarm_enable_disable() - Enable or disable the alarm.
+ * RTC_set_alarm_time() - Set the current alarm time.
+ * RTC_check_alarm_match() - Check if its alarm time.
+ * RTC_alarm_deactivate() - Deactivate alarm.
+ * RTC_get_alarm_time_hex() - Get the alarm time as hex integer.
+ * RTC_get_current_time_hex() - Get the current time as hex int.
+ * RTC_get_date_string() - Get current date as a formatted string.
+ * RTC_get_alarm_time_seconds_int() - Get alarm time seconds as int.
+ * RTC_get_alarm_time_minutes_int() - Get alarm time minutes as int.
+ * RTC_get_alarm_time_hours_int() - Get alarm time hours as int.
+ * RTC_get_alarm_time_string() - Get alarm time as a formatted string.
  **************************************************************
 */
-
 #ifndef MCP7940M_H_
 #define MCP7940M_H_
 
@@ -70,16 +96,12 @@
 #define RTC_ALARM_INACTIVE 0x00
 #define RTC_ALARM_ACTIVE 0x01
 
-extern uint8_t _currentTime[6];
-extern uint8_t _alarmTime[3];
-extern uint8_t _alarmEnabled;
-extern uint8_t _alarmStatus;
-
 /* Private functions */
 uint8_t _read_register(uint8_t regAddr);
 void _read_multiple_registers(uint8_t startAddr, uint8_t* data, uint8_t numOfReads);
 void _write_register(uint8_t regAddr, uint8_t data);
 
+/* Initialise */
 void RTC_init(); 
 
 /* Time functions */

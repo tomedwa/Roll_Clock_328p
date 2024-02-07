@@ -28,10 +28,11 @@
  * of the buffer.
  * OLED_invert_rectangle() - Invert pixels on the buffer in a
  * rectangular region.
- * OLED_draw_horizontal_line()
- * OLED_draw_vertical_line()
- * OLED_draw_rectangle()
- * OLED_draw_circle()
+ * OLED_draw_horizontal_line() - Draw a horizontal line on the scren.
+ * OLED_draw_vertical_line() - Draw a vertical line on the screen.
+ * OLED_draw_rectangle() - Draw a rectangle on the screen.
+ * OLED_draw_circle() - Draw a circle on the screen.
+ * OLED_display_invert() - Invert the display.
  **************************************************************
 */
 
@@ -46,53 +47,75 @@
 #include "XBM_fonts/XBM_FONT_NUMBERS_20.h"
 #include "XBM_fonts/XBM_FONT_NUMBERS_25.h"
 
+/* Used to store the pixel data for the OLED display */
+static uint8_t _oled_buffer[OLED_HEIGHT / 8][OLED_WIDTH];
+
+/* Private function prototypes */
+static void _single_command(uint8_t command);
+static void _multiple_command(uint8_t commands[], uint8_t numOfCommands);
+static void _send_byte(uint8_t byte);
+static uint8_t _bitread(uint8_t byte, uint8_t bit);
+static void _xbm_font_8_to_buffer(char* string, uint8_t xPosition, uint8_t yPosition, uint8_t characterSpacing, uint8_t screenOrientation);
+static void _xbm_font_16_to_buffer(char* string, uint8_t xPosition, uint8_t yPosition, uint8_t characterSpacing, uint8_t screenOrientation);
+static void _xbm_font_20_to_buffer(char* string, uint8_t xPosition, uint8_t yPosition, uint8_t characterSpacing, uint8_t screenOrientation);
+static void _xbm_font_25_to_buffer(char* string, uint8_t xPosition, uint8_t yPosition, uint8_t characterSpacing, uint8_t screenOrientation);
+
 /*
-*	OLED_init()
-*	-----------
-*	Initialise the OLED display by sending a series of initialisation commands to the screen.
+* OLED_init()
+* -----------
+* External function to Initialise the OLED display by 
+* sending a series of initialisation commands to the screen.
+* Note if any more/less commands are added to the initCommands[] array
+* then the OLED_NUMBER_OF_INITIALISATION_COMMANDS macro must be updated.
 */
 void OLED_init() {
 	i2c_init();
 	uint8_t initCommands[] = {
 		OLED_DISPLAY_OFF,
-		OLED_MUX_RATIO, 0x3F,						// Multiplex ratio 1/64 duty cycle
-		OLED_DISPLAY_OFFSET, 0x00,					// No offset
-		OLED_DISPLAY_START_LINE | 0x00,				// Start at the first row of the display
+		OLED_MUX_RATIO, 0x3F,						/* Multiplex ratio 1/64 duty cycle */
+		OLED_DISPLAY_OFFSET, 0x00,					/* No offset */
+		OLED_DISPLAY_START_LINE | 0x00,				/* Start at the first row of the display */
 		OLED_SEGMENT_REMAP_REVERSE,
 		OLED_COM_SCAN_DIRECITON_DESCENDING,
-		OLED_COM_HARDWARE_PIN_CONFIGURATION, 0x12,	// Alternative COM pin configuration
-		OLED_SET_CONTRAST, 0xFF,					// Highest contrast
-		OLED_PRE_CHARGE_PERIOD, 0xF1,				// Set pre-charge period, Phase 1 period = 15, Phase 2 period = 1
-		OLED_VCOMH_DESELECT_LEVEL, 0x40,			// Set VCOMH deselect level, VCOMH deselect level = 0.77 * VCC
-		OLED_ENTIRE_DISPLAY_NORMAL,					// Show all pixels not just the ones that are on
+		OLED_COM_HARDWARE_PIN_CONFIGURATION, 0x12,	/* Alternative COM pin configuration */
+		OLED_SET_CONTRAST, 0xFF,					/* Highest contrast */
+		OLED_PRE_CHARGE_PERIOD, 0xF1,				/* Set pre-charge period, Phase 1 period = 15, Phase 2 period = 1 */
+		OLED_VCOMH_DESELECT_LEVEL, 0x40,			/* Set VCOMH deselect level, VCOMH deselect level = 0.77 * VCC */
+		OLED_ENTIRE_DISPLAY_NORMAL,					/* Show all pixels not just the ones that are on */
 		OLED_NORMAL_DISPLAY_COMMAND,
 		OLED_DISPLAY_ON	
 	};
-	OLED_multiple_command(initCommands, 19);
+	_multiple_command(initCommands, OLED_NUMBER_OF_INITIALISATION_COMMANDS);
 }
 
+/* 
+* OLED_display_invert()
+* ---------------------
+* External function to invert the pixels on the display.
+* NOTE: This only affects the display and not the _oled_buffer[][]
+*/
 void OLED_display_invert(uint8_t invert) {
 	switch(invert) {
 		case 0:
-			OLED_single_command(OLED_NORMAL_DISPLAY_COMMAND);
+			_single_command(OLED_NORMAL_DISPLAY_COMMAND);
 			break;
 		case 1:
-			OLED_single_command(OLED_INVERT_DISPLAY_COMMAND);
+			_single_command(OLED_INVERT_DISPLAY_COMMAND);
 			break;
 	}
 }
 
 /*	
-*	OLED_single_command()
-*	---------------------
-*	Send a single command to the OLED display using i2c.
+* _single_command()
+* ---------------------
+* Private function to send a single command to the OLED display using i2c.
 *
-*	command: Command to be sent to the OLED display.
+* command: Command to be sent to the OLED display.
 *
-*	NOTE:	The command must be valid as there are no checks
-			for an invalid command.
+* NOTE:	The command must be valid as there are no checks
+*		for an invalid command.
 */ 
-void OLED_single_command(uint8_t command) {
+static void _single_command(uint8_t command) {
 	i2c_set_bitrate(OLED_I2C_BITRATE);
 	i2c_start_wait(OLED_ADDR << 1);	
 	i2c_write(OLED_COMMAND_MODE);	
@@ -101,20 +124,20 @@ void OLED_single_command(uint8_t command) {
 }
 
 /*	
-*	OLED_multiple_command()
-*	-----------------------
-*	Send multiple commands to the OLED display using i2c.
+* _multiple_command()
+* -----------------------
+* Private function to send multiple commands to the OLED display using i2c.
 *
-*	commands:	An array of commands that will be sent to the OLED display.
-*				The commands will be sent in the same order that they appear
-*				in the list.
+* commands:	An array of commands that will be sent to the OLED display.
+*			The commands will be sent in the same order that they appear
+*			in the list.
 *
-*	numOfCommands:	The number of commands in the 'commands' array.
+* numOfCommands: The number of commands in the 'commands' array.
 *	
-*	NOTE:	The commands in the array must be valid as there are no checks
-			for invalid commands.
+* NOTE:	The commands in the array must be valid as there are no checks
+*		for invalid commands.
 */
-void OLED_multiple_command(uint8_t commands[], uint8_t numOfCommands) {
+static void _multiple_command(uint8_t commands[], uint8_t numOfCommands) {
 	i2c_set_bitrate(OLED_I2C_BITRATE);
 	i2c_start_wait(OLED_ADDR << 1);	
 	i2c_write(OLED_COMMAND_MODE);	
@@ -125,26 +148,26 @@ void OLED_multiple_command(uint8_t commands[], uint8_t numOfCommands) {
 }
 
 /*
-*	OLED_clear_buffer()
-*	-------------------
-*	Clear the OLED display buffer by setting all the elements of the array to 0x00.
+* OLED_clear_buffer()
+* -------------------
+* Clear the OLED display buffer by setting all the elements of the array to 0x00.
 */
 void OLED_clear_buffer() {
 	for (uint8_t page = 0; page < OLED_HEIGHT / 8; page++) {
 		for (uint8_t column = 0; column < OLED_WIDTH; column++) {
-			OLED_BUFFER[page][column] = 0x00;
+			_oled_buffer[page][column] = 0x00;
 		}
 	}
 }
 
 /*
-*	OLED_send_byte()
-*	----------------
-*	Send a single byte of data to be displayed on the OLED screen.
+* _send_byte()
+* ----------------
+* Private function to send a single byte of data to be displayed on the OLED screen.
 *
-*	byte: The byte of data to be sent to the OLED display.
+* byte: The byte of data to be sent to the OLED display.
 */
-void OLED_send_byte(uint8_t byte) {
+static void _send_byte(uint8_t byte) {
 	i2c_set_bitrate(OLED_I2C_BITRATE);
 	i2c_start_wait(OLED_ADDR << 1);
 	i2c_write(OLED_DATA_MODE);		
@@ -153,92 +176,92 @@ void OLED_send_byte(uint8_t byte) {
 }
 
 /*
-*	OLED_display_buffer()
-*	---------------------
-*	Display the content of the buffer on the OLED display.
+* OLED_display_buffer()
+* ---------------------
+* External function to display the content of the buffer on the OLED display.
 */
 void OLED_display_buffer() {
 	uint8_t horizontalOffset = 2;	// The horizontal offset will vary depending on the hardware
 	
 	for (uint8_t page = 0; page < OLED_HEIGHT / 8; page++) {
-		OLED_single_command(OLED_SET_PAGE_ADDR + page);	// Set page address
+		_single_command(OLED_SET_PAGE_ADDR + page);	// Set page address
 		for (uint8_t column = horizontalOffset; column < OLED_WIDTH + horizontalOffset; column++) {
-			OLED_single_command(OLED_SET_LOWER_COLUMN_ADDR + (column & 0x0F));
-			OLED_single_command(OLED_SET_HIGHER_COLUMN_ADDR + ((column >> 4) & 0x0F));
-			OLED_send_byte(OLED_BUFFER[page][column - horizontalOffset]);
+			_single_command(OLED_SET_LOWER_COLUMN_ADDR + (column & 0x0F));
+			_single_command(OLED_SET_HIGHER_COLUMN_ADDR + ((column >> 4) & 0x0F));
+			_send_byte(_oled_buffer[page][column - horizontalOffset]);
 		}
 	}
 }
 
 /*
-*	OLED_draw_string()
-*	------------------
-*	Draw a string on the buffer in the correct position and orientation.
+* OLED_draw_string()
+* ------------------
+* External function to draw a string on the buffer in the correct position and orientation.
 *
-*	string: The string to be represented in the buffer.
+* string: The string to be represented in the buffer.
 *
-*	xPosition:	The x-coordinate of the starting pixel of the string.
+* xPosition:	The x-coordinate of the starting pixel of the string.
 *
-*	yPosition:	The y-coordinate of the starting pixel of the string.
+* yPosition:	The y-coordinate of the starting pixel of the string.
 *
-*	fontSize: The desired font size (Either 8 or 16 so far).
+* fontSize: The desired font size (Either 8 or 16 so far).
 *
-*	characterSpacing: The desired number of pixels between the characters stored in the buffer.
+* characterSpacing: The desired number of pixels between the characters stored in the buffer.
 *
-*	screenOrientation: The desired orientation of the screen:
-*				0 = No rotation (normal orientation).
-*				1 = 90 degrees clockwise rotation.
-*				2 = 180 degrees clockwise rotation (upside down).
-*				3 = 270 degrees clockwise rotation.
+* screenOrientation: The desired orientation of the screen:
+*		0 = No rotation (normal orientation).
+*		1 = 90 degrees clockwise rotation.
+*		2 = 180 degrees clockwise rotation (upside down).
+*		3 = 270 degrees clockwise rotation.
 *
-*	NOTE: 
-*			- Not all characters can be represented in the buffer, only those defined in the font file.
-*			- No checks for valid x and y coordinates.
+* NOTE: 
+*	- Not all characters can be represented in the buffer, only those defined in the font file.
+*	- No checks for valid x and y coordinates.
 */
 void OLED_draw_string(char* string, uint8_t xPosition, uint8_t yPosition, uint8_t fontSize, uint8_t characterSpacing, uint8_t screenOrientation) {
 	if (fontSize == 8) {
-		OLED_xbm_font_8_to_buffer(string, xPosition, yPosition, characterSpacing, screenOrientation);
+		_xbm_font_8_to_buffer(string, xPosition, yPosition, characterSpacing, screenOrientation);
 	} else if (fontSize == 16) {
-		OLED_xbm_font_16_to_buffer(string, xPosition, yPosition, characterSpacing, screenOrientation);
+		_xbm_font_16_to_buffer(string, xPosition, yPosition, characterSpacing, screenOrientation);
 	} else if (fontSize == 20) {
-		OLED_xbm_font_20_to_buffer(string, xPosition, yPosition, characterSpacing, screenOrientation);
+		_xbm_font_20_to_buffer(string, xPosition, yPosition, characterSpacing, screenOrientation);
 	} else if (fontSize == 25) {
-		OLED_xbm_font_25_to_buffer(string, xPosition, yPosition, characterSpacing, screenOrientation);
+		_xbm_font_25_to_buffer(string, xPosition, yPosition, characterSpacing, screenOrientation);
 	}
 }
 
 /*
-*	OLED_set_pixel()
-*	----------------
-*	Sets a single pixel on the display buffer at the specified position.
+* OLED_set_pixel()
+* ----------------
+* External function that sets a single pixel on the display buffer at the specified position.
 *
-*	xCoordinate:	The x-coordinate of the pixel.
+* xCoordinate:	The x-coordinate of the pixel.
 *
-*	yCoordinate:	The y-coordinate of the pixel.
+* yCoordinate:	The y-coordinate of the pixel.
 *
-*	NOTE: No checks for valid x and y coordinates.
+* NOTE: No checks for valid x and y coordinates.
 */
 void OLED_set_pixel(uint8_t xCoordinate, uint8_t yCoordinate) {
 	uint8_t page = yCoordinate / 8;
 	uint8_t column = xCoordinate;
 	uint8_t value = 1 << (yCoordinate - (yCoordinate / 8) * 8);
-	OLED_BUFFER[page][column] |= value;
+	_oled_buffer[page][column] |= value;
 }
 
 /*
-*	bitread()
-*	---------
-*	Reads the specific value bit in a given byte and returns the bit.
+* _bitread()
+* ---------
+* Private function that reads the specific value bit in a given byte and returns the bit.
 *
-*	byte:	The byte from which to read the bit.
+* byte:	The byte from which to read the bit.
 *
-*	bit:	The position of the bit to read.
+* bit:	The position of the bit to read.
 *
-*	Return:	The value of the specific bit (0 or 1)
+* Return:	The value of the specific bit (0 or 1)
 *
-*	REF:	This function is taken directly from an arduino library, do a quick google search and you will find it.
+* REF:	This function is taken directly from an arduino library, do a quick google search and you will find it.
 */
-uint8_t bitread(uint8_t byte, uint8_t bit) {
+static uint8_t _bitread(uint8_t byte, uint8_t bit) {
 	if (bit > 7) {
 		return 0;
 	}
@@ -250,30 +273,30 @@ uint8_t bitread(uint8_t byte, uint8_t bit) {
 }
 
 /*
-*	OLED_xbm_font_8_to_buffer()
-*	---------------------------
-*	Draw a string in the buffer using an xbm font 8 pixels high and various widths. This function is
-*	designed to use the font designed in XBM_FONT_8.h
+* _xbm_font_8_to_buffer()
+* ---------------------------
+* Private function to draw a string in the buffer using an xbm font 8 pixels high and various widths. This function is
+* designed to use the font designed in XBM_FONT_8.h
 *
-*	string: The string to be represented in the buffer.
+* string: The string to be represented in the buffer.
 *
-*	xPosition:	The x-coordinate of the starting pixel of the string.
+* nxPosition:	The x-coordinate of the starting pixel of the string.
 *
-*	yPosition:	The y-coordinate of the starting pixel of the string.
+* yPosition:	The y-coordinate of the starting pixel of the string.
 *
-*	characterSpacing: The desired number of pixels between the characters stored in the buffer.
+* characterSpacing: The desired number of pixels between the characters stored in the buffer.
 *	
-*	screenOrientation: The desired orientation of the string:
-*				0 = No rotation (normal orientation).
-*				1 = 90 degrees clockwise rotation.
-*				2 = 180 degrees clockwise rotation (upside down).
-*				3 = 270 degrees clockwise rotation.
+* screenOrientation: The desired orientation of the string:
+*	0 = No rotation (normal orientation).
+*	1 = 90 degrees clockwise rotation.
+*	2 = 180 degrees clockwise rotation (upside down).
+*	3 = 270 degrees clockwise rotation.
 *
-*	NOTE: 
-*			- No checks for valid x and y coordinates.
-*			- XBM_FONT_8.h must be included
+* NOTE: 
+*	- No checks for valid x and y coordinates.
+*	- XBM_FONT_8.h must be included
 */
-void OLED_xbm_font_8_to_buffer(char* string, uint8_t xPosition, uint8_t yPosition, uint8_t characterSpacing, uint8_t screenOrientation) {
+static void _xbm_font_8_to_buffer(char* string, uint8_t xPosition, uint8_t yPosition, uint8_t characterSpacing, uint8_t screenOrientation) {
 	uint8_t indexNumSize = (uint8_t)strlen(string);
 	uint8_t indexNums[indexNumSize];
 	uint8_t cursorPosition = xPosition;
@@ -322,30 +345,30 @@ void OLED_xbm_font_8_to_buffer(char* string, uint8_t xPosition, uint8_t yPositio
 }
 
 /*
-*	OLED_xbm_font_16_to_buffer()
-*	---------------------------
-*	Draw a string in the buffer using an xbm font 16 pixels high and various widths. This function is
-*	designed to use the font designed in XBM_FONT_16.h
+* _xbm_font_16_to_buffer()
+* ---------------------------
+* Private function to draw a string in the buffer using an xbm font 16 pixels high and various widths. This function is
+* designed to use the font designed in XBM_FONT_16.h
 *
-*	string: The string to be represented in the buffer.
+* string: The string to be represented in the buffer.
 *
-*	xPosition:	The x-coordinate of the starting pixel of the image.
+* xPosition:	The x-coordinate of the starting pixel of the image.
 *
-*	yPosition:	The y-coordinate of the starting pixel of the image.
+* yPosition:	The y-coordinate of the starting pixel of the image.
 *
-*	characterSpacing: The desired number of pixels between the characters stored in the buffer.
+* characterSpacing: The desired number of pixels between the characters stored in the buffer.
 *
-*	screenOrientation: The desired orientation of the string:
-*				0 = No rotation (normal orientation).
-*				1 = 90 degrees clockwise rotation.
-*				2 = 180 degrees clockwise rotation (upside down).
-*				3 = 270 degrees clockwise rotation.
+* screenOrientation: The desired orientation of the string:
+*	0 = No rotation (normal orientation).
+*	1 = 90 degrees clockwise rotation.
+*	2 = 180 degrees clockwise rotation (upside down).
+*	3 = 270 degrees clockwise rotation.
 *
-*	NOTE:
-*			- No checks for valid x and y coordinates.
-*			- XBM_FONT_16.h must be included
+* NOTE:
+*	- No checks for valid x and y coordinates.
+*	- XBM_FONT_16.h must be included
 */
-void OLED_xbm_font_16_to_buffer(char* string, uint8_t xPosition, uint8_t yPosition, uint8_t characterSpacing, uint8_t screenOrientation) {
+static void _xbm_font_16_to_buffer(char* string, uint8_t xPosition, uint8_t yPosition, uint8_t characterSpacing, uint8_t screenOrientation) {
 	uint8_t indexNumSize = (uint8_t)strlen(string);
 	uint8_t indexNums[indexNumSize];
 	uint8_t cursorPosition = xPosition;
@@ -393,7 +416,31 @@ void OLED_xbm_font_16_to_buffer(char* string, uint8_t xPosition, uint8_t yPositi
 	}
 }
 
-void OLED_xbm_font_20_to_buffer(char* string, uint8_t xPosition, uint8_t yPosition, uint8_t characterSpacing, uint8_t screenOrientation) {
+/*
+* _xbm_font_20_to_buffer()
+* ---------------------------
+* Private function to draw a string in the buffer using an xbm font 20 pixels high and various widths. This function is
+* designed to use the font designed in XBM_FONT_NUMBERS_20.h
+*
+* string: The string to be represented in the buffer.
+*
+* xPosition:	The x-coordinate of the starting pixel of the image.
+*
+* yPosition:	The y-coordinate of the starting pixel of the image.
+*
+* characterSpacing: The desired number of pixels between the characters stored in the buffer.
+*
+* screenOrientation: The desired orientation of the string:
+*	0 = No rotation (normal orientation).
+*	1 = 90 degrees clockwise rotation.
+*	2 = 180 degrees clockwise rotation (upside down).
+*	3 = 270 degrees clockwise rotation.
+*
+* NOTE:
+*	- No checks for valid x and y coordinates.
+*	- XBM_FONT_NUMBERS_20.h must be included
+*/
+static void _xbm_font_20_to_buffer(char* string, uint8_t xPosition, uint8_t yPosition, uint8_t characterSpacing, uint8_t screenOrientation) {
 	uint8_t indexNumSize = (uint8_t)strlen(string);
 	uint8_t indexNums[indexNumSize];
 	uint8_t cursorPosition = xPosition;
@@ -421,7 +468,31 @@ void OLED_xbm_font_20_to_buffer(char* string, uint8_t xPosition, uint8_t yPositi
 	}
 }
 
-void OLED_xbm_font_25_to_buffer(char* string, uint8_t xPosition, uint8_t yPosition, uint8_t characterSpacing, uint8_t screenOrientation) {
+/*
+* _xbm_font_25_to_buffer()
+* ---------------------------
+* Private function to draw a string in the buffer using an xbm font 25 pixels high and various widths. This function is
+* designed to use the font designed in XBM_FONT_NUMBERS_25.h
+*
+* string: The string to be represented in the buffer.
+*
+* xPosition:	The x-coordinate of the starting pixel of the image.
+*
+* yPosition:	The y-coordinate of the starting pixel of the image.
+*
+* characterSpacing: The desired number of pixels between the characters stored in the buffer.
+*
+* screenOrientation: The desired orientation of the string:
+*	0 = No rotation (normal orientation).
+*	1 = 90 degrees clockwise rotation.
+*	2 = 180 degrees clockwise rotation (upside down).
+*	3 = 270 degrees clockwise rotation.
+*
+* NOTE:
+*	- No checks for valid x and y coordinates.
+*	- XBM_FONT_NUMBERS_25.h must be included
+*/
+void _xbm_font_25_to_buffer(char* string, uint8_t xPosition, uint8_t yPosition, uint8_t characterSpacing, uint8_t screenOrientation) {
 	uint8_t indexNumSize = (uint8_t)strlen(string);
 	uint8_t indexNums[indexNumSize];
 	uint8_t cursorPosition = xPosition;
@@ -452,30 +523,30 @@ void OLED_xbm_font_25_to_buffer(char* string, uint8_t xPosition, uint8_t yPositi
 }
 
 /*
-*	OLED_draw_xbm()
-*	---------------
-*	Draw an xbm image on the display buffer in the correct position.
+* OLED_draw_xbm()
+* ---------------
+* External function to draw an xbm image on the display buffer in the correct position.
 *
-*	xPosition:	The x-coordinate of the starting pixel of the image.
+* xPosition: The x-coordinate of the starting pixel of the image.
 *
-*	yPositioin:	The y-coordinate of the starting pixel of the image.
+* yPositioin: The y-coordinate of the starting pixel of the image.
 *
-*	xbm:	The xbm image data stored as a PROGMEM array.
+* xbm: The xbm image data stored as a PROGMEM array.
 *
-*	width:	The width of the xbm image.
+* width: The width of the xbm image.
 *
-*	height:	The height of the xbm image.
+* height: The height of the xbm image.
 *
-*	screenOrientation: The desired orientation of the image:
-*				0 = No rotation (normal orientation).
-*				1 = 90 degrees clockwise rotation.
-*				2 = 180 degrees clockwise rotation (upside down).
-*				3 = 270 degrees clockwise rotation.
+* screenOrientation: The desired orientation of the image:
+*	0 = No rotation (normal orientation).
+*	1 = 90 degrees clockwise rotation.
+*	2 = 180 degrees clockwise rotation (upside down).
+*	3 = 270 degrees clockwise rotation.
 *
-*	NOTE:	
-*			-	The correct width and height must be given or the image will not be processed correctly. Also the xbm image must be
-*				stored as a PROGMEM array.
-			-	No checks for valid x and y coordinated.
+* NOTE:	
+*	-	The correct width and height must be given or the image will not be processed correctly. Also the xbm image must be
+*		stored as a PROGMEM array.
+	-	No checks for valid x and y coordinated.
 */
 void OLED_draw_xbm(uint8_t xPosition, uint8_t yPosition, const uint8_t xbm[], uint8_t width, uint8_t height, uint8_t screenOrientation) {
 	uint8_t originalWidth = width;
@@ -519,7 +590,7 @@ void OLED_draw_xbm(uint8_t xPosition, uint8_t yPosition, const uint8_t xbm[], ui
 		trim++;
 		
 		for (uint8_t j = 0; j < adjustedWidth; j++) {
-			if (bitread(byteColumn, j)) {
+			if (_bitread(byteColumn, j)) {
 				
 				raw_X_calclulation = (i * 8 + j) % width + xPosition;
 				raw_Y_calclulation = (8 * i / (width)) + yPosition;
@@ -552,68 +623,66 @@ void OLED_draw_xbm(uint8_t xPosition, uint8_t yPosition, const uint8_t xbm[], ui
 				}
 				OLED_set_pixel(targetX, targetY);
 			}
-
 		}
 	}
 }
 
 
-
 /*
-*	OLED_screen_off()
-*	-----------------
-*	Turn the OLED display off.
+* OLED_screen_off()
+* -----------------
+* External function to turn the OLED display off.
 */
 void OLED_screen_off() {
-	OLED_single_command(OLED_DISPLAY_OFF);
+	_single_command(OLED_DISPLAY_OFF);
 }
 
 /*
-*	OLED_screen_on()
-*	-----------------
-*	Turn the OLED display on.
+* OLED_screen_on()
+* -----------------
+* External function to turn the OLED display on.
 */
 void OLED_screen_on() {
-	OLED_single_command(OLED_DISPLAY_ON);
+	_single_command(OLED_DISPLAY_ON);
 }
 
 /*
-*	OLED_invert_buffer()
-*	--------------------
-*	Invert every pixel in the display buffer.
+* OLED_invert_buffer()
+* --------------------
+* External function to invert every pixel in the display buffer.
 */
 void OLED_invert_buffer() {
 	for (uint8_t i = 0; i < OLED_HEIGHT / 8; i++) {
 		for (uint8_t j = 0; j < OLED_WIDTH; j++) {
-			OLED_BUFFER[i][j] ^= 0xFF;
+			_oled_buffer[i][j] ^= 0xFF;
 		}
 	}
 }
 
 /*
-*	OLED_clear_pixel()
-*	----------------
-*	Clears a single pixel on the display buffer at the specified position.
+* OLED_clear_pixel()
+* ----------------
+* External function that clears a single pixel on the display buffer at the specified position.
 *
-*	xCoordinate:	The x-coordinate of the pixel.
+* xCoordinate: The x-coordinate of the pixel.
 *
-*	yCoordinate:	The y-coordinate of the pixel.
+* yCoordinate: The y-coordinate of the pixel.
 */
 void OLED_clear_pixel(uint8_t xCoordinate, uint8_t yCoordinate) {
 	uint8_t page = yCoordinate / 8;
 	uint8_t column = xCoordinate;
 	uint8_t value = ~(1 << (yCoordinate - (yCoordinate / 8) * 8));
-	OLED_BUFFER[page][column] &= value;
+	_oled_buffer[page][column] &= value;
 }
 
 /*
-*	OLED_invert_horizontal()
-*	------------------------
-*	Inverts the pixels in a horizontal region of the OLED display.
+* OLED_invert_horizontal()
+* ------------------------
+* External function that inverts the pixels in a horizontal region of the OLED display.
 *
-*	yTop:		The top y-coordinate of the horizontal region to be inverted.
+* yTop:	The top y-coordinate of the horizontal region to be inverted.
 *
-*	yBottom:	The bottom y-coordinate of the horizontal region to be inverted.
+* yBottom: The bottom y-coordinate of the horizontal region to be inverted.
 */
 void OLED_invert_horizontal(uint8_t yTop, uint8_t yBottom) {
 	uint8_t xPos;
@@ -626,7 +695,7 @@ void OLED_invert_horizontal(uint8_t yTop, uint8_t yBottom) {
 				yPos = (i * 8) + k;
 				
 				if ((yPos >= yTop) && (yPos < yBottom)) {
-					if (bitread(OLED_BUFFER[i][j], k)) {
+					if (_bitread(_oled_buffer[i][j], k)) {
 						OLED_clear_pixel(xPos, yPos);
 					} else {
 						OLED_set_pixel(xPos, yPos);
@@ -639,13 +708,13 @@ void OLED_invert_horizontal(uint8_t yTop, uint8_t yBottom) {
 }
 
 /*
-*	OLED_invert_vertical()
-*	------------------------
-*	Inverts the pixels in a vertical region of the OLED display.
+* OLED_invert_vertical()
+* ------------------------
+* External function that inverts the pixels in a vertical region of the OLED display.
 *
-*	xLeft:		The left x-coordinate of the vertical region to be inverted.
+* xLeft: The left x-coordinate of the vertical region to be inverted.
 *
-*	xRight:		The right x-coordinate of the vertical region to be inverted.
+* xRight: The right x-coordinate of the vertical region to be inverted.
 */
 void OLED_invert_vertical(uint8_t xLeft, uint8_t xRight) {
 	uint8_t xPos;
@@ -658,7 +727,7 @@ void OLED_invert_vertical(uint8_t xLeft, uint8_t xRight) {
 				yPos = (i * 8) + k;
 				
 				if ((xPos >= xLeft) && (xPos < xRight)) {
-					if (bitread(OLED_BUFFER[i][j], k)) {
+					if (_bitread(_oled_buffer[i][j], k)) {
 						OLED_clear_pixel(xPos, yPos);
 					} else {
 						OLED_set_pixel(xPos, yPos);
@@ -670,17 +739,17 @@ void OLED_invert_vertical(uint8_t xLeft, uint8_t xRight) {
 }
 
 /*
-*	OLED_invert_rectangle()
-*	-----------------------
-*	Invert the pixels within a rectangular region of the OLED display.
+* OLED_invert_rectangle()
+* -----------------------
+* External functin to invert the pixels within a rectangular region of the OLED display.
 *
-*	xLeft:		The left x-coordinate of the rectangular region to be inverted.
+* xLeft: The left x-coordinate of the rectangular region to be inverted.
 *
-*	xRight:		The right x-coordinate of the rectangular region to be inverted.
+* xRight: The right x-coordinate of the rectangular region to be inverted.
 *
-*	yTop:		The top y-coordinate of the rectangular region to be inverted.
+* yTop: The top y-coordinate of the rectangular region to be inverted.
 *
-*	yBottom:	The bottom y-coordinate of the rectangular region to be inverted.
+* yBottom: The bottom y-coordinate of the rectangular region to be inverted.
 */
 void OLED_invert_rectangle(uint8_t xLeft, uint8_t xRight, uint8_t yTop, uint8_t yBottom) {
 	uint8_t xPos;
@@ -693,7 +762,7 @@ void OLED_invert_rectangle(uint8_t xLeft, uint8_t xRight, uint8_t yTop, uint8_t 
 				yPos = (i * 8) + k;
 				
 				if ((xPos >= xLeft) && (xPos < xRight) && (yPos >= yTop) && (yPos < yBottom)) {
-					if (bitread(OLED_BUFFER[i][j], k)) {
+					if (_bitread(_oled_buffer[i][j], k)) {
 						OLED_clear_pixel(xPos, yPos);
 					} else {
 						OLED_set_pixel(xPos, yPos);
@@ -705,17 +774,17 @@ void OLED_invert_rectangle(uint8_t xLeft, uint8_t xRight, uint8_t yTop, uint8_t 
 }
 
 /*
-*	OLED_draw_horizontal_line()
-*	---------------------------
-*	Draw a horizontal line on the OLED display buffer.
+* OLED_draw_horizontal_line()
+* ---------------------------
+* External function to draw a horizontal line on the OLED display buffer.
 *
-*	xStart:		The starting x-coordinate of the horizontal line.
+* xStart: The starting x-coordinate of the horizontal line.
 *
-*	xEnd:		The ending x-coordinate of the horizontal line.
+* xEnd: The ending x-coordinate of the horizontal line.
 *
-*	yPosition:	The y-coordinate at which the horizontal line will be drawn.
+* yPosition: The y-coordinate at which the horizontal line will be drawn.
 *
-*	NOTE: No checks for valid positioning of the line.
+* NOTE: No checks for valid positioning of the line.
 */
 void OLED_draw_horizontal_line(uint8_t xStart, uint8_t xEnd, uint8_t yPosition) {
 	for (uint8_t i = xStart; i < xEnd; i++) {
@@ -724,18 +793,18 @@ void OLED_draw_horizontal_line(uint8_t xStart, uint8_t xEnd, uint8_t yPosition) 
 }
 
 /*
-*	OLED_draw_vertical_line()
-*	---------------------------
-*	Draw a vertical line on the OLED display buffer.
+* OLED_draw_vertical_line()
+* ---------------------------
+* External function to draw a vertical line on the OLED display buffer.
 *
-*	yStart:		The starting y-coordinate of the vertical line.
+* yStart: The starting y-coordinate of the vertical line.
 *
-*	yEnd:		The ending y-coordinate of the vertical line.
+* yEnd: The ending y-coordinate of the vertical line.
 *
-*	xPosition:	The x-coordinate at which the vertical line will be drawn.
+* xPosition: The x-coordinate at which the vertical line will be drawn.
 *
 *
-*	NOTE: No checks for valid positioning of the line.
+* NOTE: No checks for valid positioning of the line.
 */
 void OLED_draw_vertical_line(uint8_t yStart, uint8_t yEnd, uint8_t xPosition) {
 	for (uint8_t i = yStart; i < yEnd; i++) {
@@ -744,21 +813,21 @@ void OLED_draw_vertical_line(uint8_t yStart, uint8_t yEnd, uint8_t xPosition) {
 }
 
 /*
-*	OLED_draw_rectangle()
-*	---------------------
-*	Draw a rectangle on the display buffer. You can choose whether the rectangle is solid or an outline.
+* OLED_draw_rectangle()
+* ---------------------
+* External function to draw a rectangle on the display buffer. You can choose whether the rectangle is solid or an outline.
 *
-*	xPosition:	The x-coordinate of the top left corner of the rectangle.
+* xPosition: The x-coordinate of the top left corner of the rectangle.
 *
-*	yPosition:	The y-coordinate of the top left corner of the rectangle.
+* yPosition: The y-coordinate of the top left corner of the rectangle.
 *
-*	width:		The width of the rectangle.
+* width: The width of the rectangle.
 *
-*	height:		The height of the rectangle.
+* height: The height of the rectangle.
 *
-*	filled:
-*			-	0 = Not filled (outline).
-*			-	1 = Filled (solid).
+* filled:
+*	-	0 = Not filled (outline).
+*	-	1 = Filled (solid).
 *
 *
 *	NOTE: No checks for valid positioning of the rectangle.
@@ -779,22 +848,22 @@ void OLED_draw_rectangle(uint8_t xPosition, uint8_t yPosition, uint8_t width, ui
 }
 
 /*
-*	OLED_draw_circle()
-*	------------------
-*	Draw a circle on the display buffer, either an outline or solid shape.
-*	The circle is drawn using the Midpoint Circle Algorithm.
+* OLED_draw_circle()
+* ------------------
+* External function to draw a circle on the display buffer, either an outline or solid shape.
+* The circle is drawn using the Midpoint Circle Algorithm.
 *
-*	xCenter:	The x-coordinate of the center of the circle.
+* xCenter: The x-coordinate of the center of the circle.
 *
-*	yCenter:	The y-coordinate of the center of the circle.
+* yCenter: The y-coordinate of the center of the circle.
 *
-*	radius:		The radius of the circle.
+* radius: The radius of the circle.
 *
-*	filled:
-*			-	0 = Not filled (outline).
-*			-	1 = Filled (solid).
+* filled:
+*	-	0 = Not filled (outline).
+*	-	1 = Filled (solid).
 *
-*	NOTE: No checks for valid positioning of the circle.
+* NOTE: No checks for valid positioning of the circle.
 */
 void OLED_draw_circle(uint8_t xCenter, uint8_t yCenter, uint8_t radius, uint8_t filled) {
 	int8_t x = radius;	

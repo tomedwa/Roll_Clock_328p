@@ -14,7 +14,34 @@
  * RTC_init() - Initialise the RTC.
  * RTC_set_time() - Set the current time on the RTC.
  * RTC_update_current_time() - Get the current time on the RTC.
- * RTC_get_time_string() - Get the current time formatted as a string.
+ * RTC_get_time_seconds_int() - Get time in seconds as integer.
+ * RTC_get_time_minutes_int() - Get time in minutes as integer.
+ * RTC_get_time_hours_int() - Get time in hours as integer.
+ * RTC_get_time_string() - Get current time formatted as a string.
+ * RTC_set_weekday() - Set the weekday on the RTC.
+ * RTC_get_weekday_int() - Get current weekday as integer.
+ * RTC_get_weekday_string() - Get current weekday as a string.
+ * RTC_set_date_day() - Set date of day on RTC.
+ * RTC_get_date_day_string() - Get date of day as string.
+ * RTC_set_month() - Set current month on RTC.
+ * RTC_get_month_int() - Get current month as integer.
+ * RTC_get_month_num_string() - Get current month integer as string.
+ * RTC_get_month_name_string() - Get current month as string.
+ * RTC_set_year() - Set year on RTC.
+ * RTC_get_year_int() - Get the year as an integer.
+ * RTC_get_year_string() - Get year as a string.
+ * RTC_set_date() - Set the current date on the RTC.
+ * RTC_alarm_enable_disable() - Enable or disable the alarm.
+ * RTC_set_alarm_time() - Set the current alarm time.
+ * RTC_check_alarm_match() - Check if its alarm time.
+ * RTC_alarm_deactivate() - Deactivate alarm.
+ * RTC_get_alarm_time_hex() - Get the alarm time as hex integer.
+ * RTC_get_current_time_hex() - Get the current time as hex int.
+ * RTC_get_date_string() - Get current date as a formatted string.
+ * RTC_get_alarm_time_seconds_int() - Get alarm time seconds as int.
+ * RTC_get_alarm_time_minutes_int() - Get alarm time minutes as int.
+ * RTC_get_alarm_time_hours_int() - Get alarm time hours as int.
+ * RTC_get_alarm_time_string() - Get alarm time as a formatted string.
  **************************************************************
 */
 
@@ -25,10 +52,10 @@
 #include "MCP7940N.h"
 #include "../pFleury_i2c_stuff/i2cmaster.h"
 
-uint8_t _currentTime[6];
-uint8_t _alarmTime[3];
-uint8_t _alarmEnabled;
-uint8_t _alarmStatus;
+static uint8_t _currentTime[6];
+static uint8_t _alarmTime[3];
+static uint8_t _alarmEnabled;
+static uint8_t _alarmStatus;
 
 /*
  * _read_register()
@@ -84,7 +111,7 @@ void _write_register(uint8_t regAddr, uint8_t data) {
 /*
  * RTC_init()
  * -----------
- * Initialise the RTC and enable external oscillator.
+ * External function to initialise the RTC and enable external oscillator.
 */
 void RTC_init() {
 	i2c_init();
@@ -104,7 +131,7 @@ void RTC_init() {
 /*
  * RTC_set_time()
  * ---------------
- * Set the time on the RTC. The values must be in hexadecimal form. 
+ * External function to set the time on the RTC. The values must be in hexadecimal form. 
  * e.g. To set the time to 15:45:16, call the function:
  *		RTC_set_time( 0x15, 0x45, 0x16 )
  * As you can see the tens digit is stored in the upper byte and the ones
@@ -119,7 +146,7 @@ void RTC_set_time(uint8_t hour, uint8_t min, uint8_t sec) {
 /*
  * RTC_update_current_time()
  * ----------------------
- * Read the time keeping registers on the RTC and store the values in the RTC_TIME array.
+ * External function to read the time keeping registers on the RTC and store the values in the RTC_TIME array.
 */
 void RTC_update_current_time() {
 	uint8_t rawTimeData[] = {0, 0, 0};
@@ -134,18 +161,42 @@ void RTC_update_current_time() {
 	_currentTime[5] = (rawTimeData[2] & 0x0F);
 }
 
+/*
+* RTC_get_current_time_seconds_int()
+* -----------------------------------
+* External function that returns the last recorded time in seconds as 
+* a base 10 integer.
+*/
 uint8_t RTC_get_time_seconds_int() {
 	return ( _currentTime[0] * 10 ) + _currentTime[1];
 }
 
+/*
+* RTC_get_current_time_minutes_int()
+* -----------------------------------
+* External function that returns the last recorded time in minutes as
+* a base 10 integer.
+*/
 uint8_t RTC_get_time_minutes_int() {
 	return ( _currentTime[2] * 10 ) + _currentTime[3];
 }
 
+/*
+* RTC_get_current_time_hours_int()
+* -----------------------------------
+* External function that returns the last recorded time in hours as
+* a base 10 integer.
+*/
 uint8_t RTC_get_time_hours_int() {
 	return ( _currentTime[4] * 10 ) + _currentTime[5];
 }
 
+/*
+* RTC_get_time_string()
+* ----------------------
+* External function that populates a given string with the current
+* time formatted as: HH:MM:SS
+*/
 void RTC_get_time_string(char string[9]) {
 	string[0] = _currentTime[4] + 48;
 	string[1] = _currentTime[5] + 48;
@@ -161,8 +212,9 @@ void RTC_get_time_string(char string[9]) {
 /*
 * RTC_set_weekday()
 * -------------
-* Set the day on the RTCC. Monday = 1, Tuesday = 2, yada yada, Sunday = 7.
-* Only values from 1-7 are valid, any other values for the day will be ignored.
+* External function to set the day on the RTCC. Monday = 1, 
+* Tuesday = 2, yada yada, Sunday = 7. Only values from 1-7 
+* are valid, any other values for the day will be ignored.
 */
 void RTC_set_weekday(uint8_t day) {
 	/* Check if the day is valid. (only numbers 1-7) */
@@ -175,9 +227,10 @@ void RTC_set_weekday(uint8_t day) {
 /*
 * RTC_get_weekday_int()
 * ---------------------
-* Return the value in the RTCWKDAY (0x03) register as an integer. The value
-* of the register includes a oscillator status bit at bit 5, whereas the day
-* is stored in the first 3 bits. This is why the result is masked to return
+* External function to return the value in the RTCWKDAY (0x03) 
+* register as an integer. The value of the register includes 
+* a oscillator status bit at bit 5, whereas the day is stored 
+* in the first 3 bits. This is why the result is masked to return
 * the first 3 bits.
 * 1 = Monday, 2 = Tuesday, ..., 7 = Sunday.
 */
@@ -189,7 +242,8 @@ uint8_t RTC_get_weekday_int() {
 /*
 * RTC_get_weekday_string()
 * ------------------------
-* Return the current day of the week stored in the RTCC as a string.
+* External function that returns the current day of the 
+* week stored in the RTCC as a string.
 */
 const char* RTC_get_weekday_string() {
 	uint8_t dayInt = RTC_get_weekday_int();
@@ -215,9 +269,9 @@ const char* RTC_get_weekday_string() {
 /*
 * RTC_set_date_day()
 * ------------------
-* Set the date of the day in a month. The input dateDay needs to be a
-* hex number with the tens digit being a number from 0-3, and the ones
-* digit from 0-9.
+* External function to set the date of the day in a month. 
+* The input dateDay needs to be a hex number with the tens digit 
+* being a number from 0-3, and the ones digit from 0-9.
 * e.g. setting the date to be the 23rd,
 *		RTC_set_date_day( 0x23 );
 */
@@ -228,7 +282,8 @@ void RTC_set_date_day(uint8_t dateDay) {
 /*
 * RTC_get_day_date_int()
 * ----------------------
-* Return the current date on the RTCC as an integer.
+* External function that returns the current date on the RTCC 
+* as a base 10 integer.
 */
 uint8_t RTC_get_date_day_int() {
 	uint8_t dateDayHex = _read_register(RTC_DATE_DAY_REGISTER);
@@ -239,10 +294,7 @@ uint8_t RTC_get_date_day_int() {
 /*
 * RTC_get_date_day_string()
 * -------------------------
-* Return the current date on the RTCC as a string. To do this the value
-* stored in the RTCDATE register (0x04) must be converted to a decimal value
-* where bits 4 and 5 are the tens digit and the lower 4 bits are the ones digit.
-* e.g. 0x23 = 23
+* External function to populate a given string with the current date on the RTCC.
 */
 void RTC_get_date_day_string(char string[3]) {
 	uint8_t dateDayDec = RTC_get_date_day_int();
@@ -260,9 +312,14 @@ void RTC_get_date_day_string(char string[3]) {
 /*
 * RTC_set_month()
 * ---------------
-* Set the month on the RTCC. The input month needs to be a hex number with the tens
-* digit being stored in bit 5 and having a value of 0-1. The ones digit is stored
-* in bits 0-4 and has a value from 0-9.
+* External functions to set the month on the RTCC. The input 
+* month needs to be a hex number with the tens digit being 
+* stored in bit 5 and having a value of 0-1. The ones digit 
+* is stored in bits 0-4 and has a value from 0-9.
+* e.g. To set the month to be September:
+*		RTC_set_month(0x09);
+* e.g. December:
+*		RTC_set_month(0x12);
 */
 void RTC_set_month(uint8_t month) {
 	_write_register(RTC_MONTH_REGISTER, month);
@@ -271,9 +328,11 @@ void RTC_set_month(uint8_t month) {
 /*
 * RTC_get_month_int()
 * -------------------
-* Return the value stored in the RTCMTH register (0x05). The value stored
-* in the register is a hex number that represents a decimal number. The tens
-* digit is stored in bit 5, and the ones digit is stored in bits 0-4.
+* External function to return the value stored in the 
+* RTCMTH register (0x05). The value stored in the register 
+* is a hex number that represents a decimal number. The tens
+* digit is stored in bit 5, and the ones digit is stored in 
+* bits 0-4.
 * e.g. 0x12 = 12
 */
 uint8_t RTC_get_month_int() {
@@ -285,7 +344,8 @@ uint8_t RTC_get_month_int() {
 /*
 * RTC_get_month_num_string()
 * --------------------------
-* Return the number representing the month as a string.
+* External function to populate a given string with the number 
+* representing the month as a string.
 */
 void RTC_get_month_num_string(char string[3]) {
 	uint8_t monthNum = RTC_get_month_int();
@@ -304,7 +364,7 @@ void RTC_get_month_num_string(char string[3]) {
 /*
 * RTC_get_month_name_string()
 * ---------------------------
-* Return the name of the month.
+* External function to return the name of the month as string.
 */
 const char* RTC_get_month_name_string() {
 	uint8_t monthNum = _read_register(RTC_MONTH_REGISTER);
@@ -357,9 +417,12 @@ const char* RTC_get_month_name_string() {
 /*
 * RTC_set_year()
 * --------------
-* Set the year on the RTCC. The year must be represented as a hex number
-* with the upper 4 bits as the tens digit, and lower 4 bits as the ones
-* digit.
+* External function to set the year on the RTCC. 
+* The year must be represented as a hex number
+* with the upper 4 bits as the tens digit, and 
+* lower 4 bits as the ones digit.
+* e.g. To set year to 98:
+*	RTC_set_year(0x98);
 */
 void RTC_set_year(uint8_t year) {
 	_write_register(RTC_YEAR_REGISTER, year);
@@ -368,7 +431,8 @@ void RTC_set_year(uint8_t year) {
 /*
 * RTC_get_year_int()
 * ------------------
-* Return the current year stored on the RTCC as a decimal number.
+* External function to return the current year stored 
+* on the RTCC as a base 10 integer.
 */
 uint8_t RTC_get_year_int() {
 	uint8_t yearHex = _read_register(RTC_YEAR_REGISTER);
@@ -379,7 +443,8 @@ uint8_t RTC_get_year_int() {
 /*
 * RTC_get_year_string()
 * ---------------------
-* Return the current year stored on the RTCC as a string.
+* External function to populate a given string with the 
+* current year stored on the RTCC.
 */
 void RTC_get_year_string(char string[3]) {
 	uint8_t year = RTC_get_year_int();
@@ -398,7 +463,7 @@ void RTC_get_year_string(char string[3]) {
 /*
 * RTC_set_date()
 * --------------
-* Set the date on the RTCC.
+* External function to set the date on the RTCC.
 */
 void RTC_set_date(uint8_t dayDate, uint8_t month, uint8_t year) {
 	RTC_set_date_day(dayDate);
@@ -406,6 +471,11 @@ void RTC_set_date(uint8_t dayDate, uint8_t month, uint8_t year) {
 	RTC_set_year(year);
 }
 
+/*
+* RTC_alarm_enable_disable()
+* --------------------------
+* External function to enable and disable the alarm funcitonality.
+*/
 void RTC_alarm_enable_disable(uint8_t value) {
 	_alarmEnabled = value;
 	if (value == RTC_ALARM_DISABLED) {
@@ -413,24 +483,57 @@ void RTC_alarm_enable_disable(uint8_t value) {
 	}
 }
 
+/*
+* RTC_set_alarm_time()
+* --------------------
+* External function to set the alarm time. The alarm time input must be 
+* hex numbers representing base 10 integers. 
+* e.g. 12 = 0x12
+* e.g. Set the alarm time to 21:20:33
+*		RTC_set_alarm_time(0x21, 0x20, 0x33);
+*/
 void RTC_set_alarm_time(uint8_t hours, uint8_t minutes, uint8_t seconds) {
 	_alarmTime[0] = (((seconds & 0xF0) >> 4) * 10) + (seconds & 0x0F);
 	_alarmTime[1] = (((minutes & 0xF0) >> 4) * 10) + (minutes & 0x0F);
 	_alarmTime[2] = (((hours & 0xF0) >> 4) * 10) + (hours & 0x0F);
 }
 
+/*
+* RTC_get_alarm_time_seconds_int()
+* ---------------------------------
+* External function to return the alarm time in seconds
+* as a base 10 integer.
+*/
 uint8_t RTC_get_alarm_time_seconds_int() {
 	return _alarmTime[0];
 }
 
+/*
+* RTC_get_alarm_time_minutes_int()
+* ---------------------------------
+* External function to return the alarm time in seconds
+* as a base 10 integer.
+*/
 uint8_t RTC_get_alarm_time_minutes_int() {
 	return _alarmTime[1];
 }
 
+/*
+* RTC_get_alarm_time_hours_int()
+* ---------------------------------
+* External function to return the alarm time in hours
+* as a base 10 integer.
+*/
 uint8_t RTC_get_alarm_time_hours_int() {
 	return _alarmTime[2];
 }
 
+/*
+* RTC_check_alarm_match()
+* -----------------------
+* External function to check if the current alarm time 
+* matches with the current time.
+*/
 uint8_t RTC_check_alarm_match() {
 	if ((_alarmEnabled == RTC_ALARM_ENABLED) && (_alarmStatus == RTC_ALARM_INACTIVE)) {
 		if ((RTC_get_time_seconds_int() == RTC_get_alarm_time_seconds_int()) &&
@@ -442,10 +545,21 @@ uint8_t RTC_check_alarm_match() {
 	return _alarmStatus;
 }
 
+/*
+* RTC_alarm_deactivate()
+* ----------------------
+* External function to deactivate the alarm.
+*/
 void RTC_alarm_deactivate() {
 	_alarmStatus = RTC_ALARM_INACTIVE;
 }
 
+/*
+* RTC_get_date_string()
+* ---------------------
+* External function to populate a given string with the
+* current date formatted as: DD-MM-YY
+*/
 void RTC_get_date_string(char string[9]) {
 	uint8_t dayDate = RTC_get_date_day_int();
 	uint8_t month = RTC_get_month_int();
@@ -462,6 +576,12 @@ void RTC_get_date_string(char string[9]) {
 	string[8] = '\0';
 }
 
+/*
+* RTC_get_alarm_time_string()
+* ---------------------------
+* External function to populate a string with the current
+* alarm time formatted as: HH:MM:SS
+*/
 void RTC_get_alarm_time_string(char string[9]) {
 	string[0] = (_alarmTime[2] / 10) + 48;
 	string[1] = (_alarmTime[2] % 10) + 48;

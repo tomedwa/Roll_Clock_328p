@@ -28,10 +28,11 @@
  * of the buffer.
  * OLED_invert_rectangle() - Invert pixels on the buffer in a
  * rectangular region.
- * OLED_draw_horizontal_line()
- * OLED_draw_vertical_line()
- * OLED_draw_rectangle()
- * OLED_draw_circle()
+ * OLED_draw_horizontal_line() - Draw a horizontal line on the scren.
+ * OLED_draw_vertical_line() - Draw a vertical line on the screen.
+ * OLED_draw_rectangle() - Draw a rectangle on the screen.
+ * OLED_draw_circle() - Draw a circle on the screen.
+ * OLED_display_invert() - Invert the display.
  **************************************************************
 */
 
@@ -42,6 +43,8 @@
 #define OLED_HEIGHT	64
 
 #define OLED_I2C_BITRATE 450000L
+
+#define OLED_NUMBER_OF_INITIALISATION_COMMANDS 19
 
 #define OLED_CLOCKWISE_0	0
 #define OLED_CLOCKWISE_90	1
@@ -73,21 +76,11 @@
 #define OLED_NORMAL_DISPLAY_COMMAND			0xA6
 #define OLED_INVERT_DISPLAY_COMMAND			0xA7
 
-uint8_t OLED_BUFFER[OLED_HEIGHT / 8][OLED_WIDTH]; // Used to store the pixel data for the OLED display.
-
 void OLED_init();
-void OLED_single_command(uint8_t command);
-void OLED_multiple_command(uint8_t commands[], uint8_t numOfCommands);
 void OLED_clear_buffer();
-void OLED_send_byte(uint8_t byte);
 void OLED_display_buffer();
 void OLED_draw_string(char* string, uint8_t xPosition, uint8_t yPosition, uint8_t fontSize, uint8_t characterSpacing, uint8_t screenOrientation);
 void OLED_set_pixel(uint8_t xCoordinate, uint8_t yCoordinate);
-uint8_t bitread(uint8_t byte, uint8_t bit);
-void OLED_xbm_font_8_to_buffer(char* string, uint8_t xPosition, uint8_t yPosition, uint8_t characterSpacing, uint8_t screenOrientation);
-void OLED_xbm_font_16_to_buffer(char* string, uint8_t xPosition, uint8_t yPosition, uint8_t characterSpacing, uint8_t screenOrientation);
-void OLED_xbm_font_20_to_buffer(char* string, uint8_t xPosition, uint8_t yPosition, uint8_t characterSpacing, uint8_t screenOrientation);
-void OLED_xbm_font_25_to_buffer(char* string, uint8_t xPosition, uint8_t yPosition, uint8_t characterSpacing, uint8_t screenOrientation);
 void OLED_draw_xbm(uint8_t xPosition, uint8_t yPosition, const uint8_t xbm[], uint8_t width, uint8_t height, uint8_t screenOrientation);
 void OLED_screen_off();
 void OLED_screen_on();
