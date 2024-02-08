@@ -1,6 +1,6 @@
 /*
  **************************************************************
- * SH1106_OLED.h
+ * SH1106_OLED.c
  * Author: Tom
  * Date: 10/11/2023
  * AVR Library for 128x64 SH1106 OLED Display Module. This lib

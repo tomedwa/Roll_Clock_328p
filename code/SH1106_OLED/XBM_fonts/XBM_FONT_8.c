@@ -1,3 +1,13 @@
+/*
+ **************************************************************
+ * XBM_FONT_8.c
+ * Author: Tom
+ * Date: 13/11/2023
+ * Font for use in the SH1106 library I created. Characters
+ * are 8 pixels tall.
+ **************************************************************
+*/
+
 #include <avr/pgmspace.h>
 #include "XBM_FONT_8.h"
 
