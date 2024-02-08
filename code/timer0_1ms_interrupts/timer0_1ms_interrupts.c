@@ -1,6 +1,6 @@
 /*
  **************************************************************
- * timer0_1ms_interrupts.h
+ * timer0_1ms_interrupts.c
  * Author: Tom
  * Date: 18/01/2024
  * Use timer0 on the Atmega328p to generate an interrupt
