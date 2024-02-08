@@ -23,10 +23,13 @@
 
 #include <avr/io.h>
 #include <stdio.h>
+#include <avr/interrupt.h>
 #include "ADXL343.h"
 
 /* Current axis readings will be stored here. */
 static int32_t _adxl_axis_readings[3];
+
+static uint8_t _doubleTapStatus;
 
 #ifdef ADXL343_SPI_MODE
 	#include "../Atmega328p_SPI/Atmega328p_SPI.h"
@@ -197,4 +200,111 @@ void ADXL343_get_y_axis_string(char string[6]) {
 */
 void ADXL343_get_z_axis_string(char string[6]) {
 	snprintf(string, sizeof(string), "%ld", _adxl_axis_readings[2]);
+}
+
+void ADXL343_double_tap_init() {
+	
+	_doubleTapStatus = ADXL343_DOUBLETAP_NOT_DETECTED;
+	
+	/* Enable pin change interrupts globally */
+	PCICR |= (1 << PCIE2);
+	
+	/* Set PD4 (PCINT20) as input with pull down resistor */
+	DDRD &= ~(1 << 4);
+	PORTD &= ~(1 << 4);
+	
+	/* Enable pin change interrupt for PD4 (PCINT20) */
+	PCMSK2 |= (1 << PCINT20);
+	
+	/* Enable global interrupts */
+	sei();
+	
+	#ifdef ADXL343_SPI_MODE
+	/* SPI COMMS */
+	
+	#else
+	/* I2C COMMS */
+	i2c_set_bitrate(ADXL343_I2C_BITRATE);
+	
+	 /* Disable interrupts for double tap */
+	i2c_start_wait(I2C_WRITE_ADDR);
+	i2c_write(ADXL343_INT_ENABLE_CONTROL);
+	i2c_write(0x00);
+	i2c_stop();
+	
+	/* Set tap duration */
+	i2c_start_wait(I2C_WRITE_ADDR);
+	i2c_write(ADXL343_TAP_DURATION);
+	i2c_write(0x15);
+	i2c_stop();
+	
+	/* Set tap latency */
+	i2c_start_wait(I2C_WRITE_ADDR);
+	i2c_write(ADXL343_TAP_LATENCY);
+	i2c_write(0x10);
+	i2c_stop();
+	
+	/* Set tap window */
+	i2c_start_wait(I2C_WRITE_ADDR);
+	i2c_write(ADXL343_TAP_WINDOW);
+	i2c_write(0xF0);
+	i2c_stop();
+	
+	/* Set tap threshold */
+	i2c_start_wait(I2C_WRITE_ADDR);
+	i2c_write(ADXL343_TAP_THRESHOLD);
+	i2c_write(0x80);
+	i2c_stop();
+	
+	/* Activate y-axis */
+	i2c_start_wait(I2C_WRITE_ADDR);
+	i2c_write(ADXL343_TAP_AXES);
+	i2c_write(0x02);
+	i2c_stop();
+	
+	/* Double tap triggers INT1 */
+	i2c_start_wait(I2C_WRITE_ADDR);
+	i2c_write(ADXL343_INTERRUPT_MAPPING_CONTROL);
+	i2c_write(0x00);
+	i2c_stop();
+	
+	/* Enable interrupts for double tap */
+	i2c_start_wait(I2C_WRITE_ADDR);
+	i2c_write(ADXL343_INT_ENABLE_CONTROL);
+	i2c_write(0x20);
+	i2c_stop();
+	
+	#endif /* ADXL343_SPI_MODE */
+}
+
+uint8_t ADXL343_get_double_tap_status() {
+	return _doubleTapStatus;
+}
+
+void ADXL343_clear_double_tap() {
+	_doubleTapStatus = ADXL343_DOUBLETAP_NOT_DETECTED;
+	
+	/* Disable pin change interrupt for PD4 (PCINT20) */
+	PCMSK2 &= ~(1 << PCINT20);
+	
+	#ifdef ADXL343_SPI_MODE
+	/* SPI COMMS */
+	
+	#else
+	/* I2C COMMS */
+	i2c_set_bitrate(ADXL343_I2C_BITRATE);
+	
+	i2c_start_wait(I2C_WRITE_ADDR);
+	i2c_write(ADXL343_INTERRUPT_SOURCE);
+	i2c_rep_start(I2C_READ_ADDR);
+	i2c_readNak();
+	i2c_stop();
+	#endif
+	
+	/* Enable pin change interrupt for PD4 (PCINT20) */
+	PCMSK2 |= (1 << PCINT20);
+}
+
+ISR(PCINT2_vect) {
+	_doubleTapStatus = ADXL343_DOUBLETAP_DETECTED;
 }
