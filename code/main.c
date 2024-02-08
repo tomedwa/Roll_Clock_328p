@@ -113,7 +113,6 @@ int main(void) {
 	DDRC &= ~(1 << 3); /* Alarm off */
 
     while (1) {
-		
 		/* Update current system time */
 		currentTime = timer0_get_current_time(); 
 		
