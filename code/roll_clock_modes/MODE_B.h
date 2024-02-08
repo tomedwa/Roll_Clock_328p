@@ -1,6 +1,6 @@
 /*
  **************************************************************
- * MODE_B.h
+ * MODE_B.c
  * Author: Tom
  * Date: 05/02/2024
  * Designed for my Roll Clock Project. This lib manages the 

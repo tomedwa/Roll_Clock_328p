@@ -44,9 +44,6 @@ the time or date. e.g Time = HH:MM:SS and Date = DD:MM:YY.
 #define MODE_A_STRING_INDEX_RIGHT_TENS	0x06	/* Tens place of the right segment */
 #define MODE_A_STRING_INDEX_RIGHT_ONES	0x07	/* Ones place of the right segment */
 
-#define MODE_A_BUTTON_RELEASED	0x00
-#define MODE_A_BUTTON_PRESSED	0x01
-
 void MODE_A_init();
 void MODE_A_control();
 

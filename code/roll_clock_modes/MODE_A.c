@@ -1,6 +1,6 @@
 /*
  **************************************************************
- * MODE_A.h
+ * MODE_A.c
  * Author: Tom
  * Date: 05/02/2024
  * Designed for my Roll Clock Project. This lib manages the 
@@ -26,6 +26,8 @@
 #include "../MCP7940N_RTCC/MCP7940N.h"
 #include "../SH1106_OLED/SH1106.h"
 #include "../XBM_symbols/XBM_symbols.h"
+#include "../buttons/buttons.h"
+#include "../ADXL343_accelerometer/ADXL343.h"
 
 static uint8_t _menuHighlight; /* Which menu item is highlighted */
 static uint8_t _menuSelection;	/* Which menu item is selected */
@@ -45,9 +47,6 @@ The '-1' values indicate the positions of non-integer characters in the _setting
 (e.g., the colons in HH:MM:SS).
 */
 static const int8_t _dateDigitsIndexOffset[8] = {6, 7, -1, 3, 4, -1, 0, 1};
-	
-static uint8_t _selectPress; /* Signals when the select button has been pressed */
-static uint8_t _nextPress; /* Signals when the next button has been pressed */
 
 /* Private function prototypes */
 static void _display_date_and_time();
@@ -77,46 +76,6 @@ void MODE_A_init() {
 	_settingsModeStatus = MODE_A_SETTINGS_OFF;
 	_selectedDigit = MODE_A_STRING_INDEX_LEFT_TENS;
 	_digitIncrementFlag = MODE_A_SETTINGS_HOLD_DIGIT;
-	
-	_selectPress = MODE_A_BUTTON_RELEASED;
-	_nextPress = MODE_A_BUTTON_RELEASED;
-	
-	/* Set PD2 (INT0) and PD3 (INT1) as input with pull-down resistor enabled */
-	DDRD &= ~((1 << 2) | (1 << 3));
-	PORTD &= ~((1 << 2) | (1 << 3));
-	
-	/* Enable external interrupts INT0 and INT1 */
-	EICRA |= (1 << ISC00) | (1 << ISC01) | (1 << ISC10) | (1 << ISC11); /* Rising edge triggers interrupts for INT0 and INT1 */
-	EIMSK |= (1 << INT0) | (1 << INT1);   /* Enable INT0 and INT1 interrupts */
-	
-	// Enable global interrupts
-	sei();
-}
-
-ISR(INT0_vect) {
-	/* Disable further interrupts on INT0 */
-	EIMSK &= ~(1 << INT0);
-	
-	/* Wait for short debounce period */
-	_delay_ms(10);
-		
-	_selectPress = 1;
-
-	 /* Re-enable interrupts on INT0 */
-	 EIMSK |= (1 << INT0);
-}
-
-ISR(INT1_vect) {
-	/* Disable further interrupts on INT1 */
-	EIMSK &= ~(1 << INT1);
-	
-	/* Wait for debounce period */
-	_delay_ms(10); 
-	
-	_nextPress = 1;
-
-	/* Re-enable interrupts on INT1 */
-	EIMSK |= (1 << INT1);
 }
 
 /*
@@ -128,19 +87,20 @@ void MODE_A_control() {
 	
 	/* If an interrupt for the select button is detected or if 
 	the select button has been held down */
-	if (_selectPress == 1 || (PIND & (1 << 2))) {
-		_selectPress = 0;
+	
+	if (buttons_select_status() == BUTTON_PRESSED || buttons_button_down(BUTTON_SELECT)) {
+		buttons_select_set_status(BUTTON_RELEASED);
 		_button_select_logic();
 	}
 	
 	/* If an interrupt for the next button is detected or if 
 	the next button has been held down */
-	if (_nextPress == 1 || (PIND & (1 << 3))) {
-		_nextPress = 0;
+	
+	if (buttons_next_status() == BUTTON_PRESSED || buttons_button_down(BUTTON_NEXT)) {
+		buttons_next_set_status(BUTTON_RELEASED);
 		_button_next_logic();
 	}
-	
-	
+		
 	if (_settingsModeStatus == MODE_A_SETTINGS_OFF) {
 		_display_date_and_time();
 	} else {
@@ -180,8 +140,18 @@ static void _display_date_and_time() {
 	OLED_draw_vertical_line(36, 63, 102);
 	OLED_draw_rectangle(0, 0, 127, 63, 0);
 	
-	/* Temp */
-	OLED_draw_xbm(106, 37, alarmBellIconUnarmed, 18, 24, MODE_A);
+	if (RTC_check_alarm_match() == RTC_ALARM_INACTIVE && ADXL343_get_double_tap_status() == ADXL343_DOUBLETAP_DETECTED) {
+		RTC_alarm_enable_disable((RTC_get_alarm_enable_disable() + 1) % 2);
+		ADXL343_clear_double_tap();
+	}
+	
+	if (RTC_get_alarm_enable_disable() == RTC_ALARM_DISABLED) {
+		OLED_draw_xbm(106, 37, alarmBellIconUnarmed, 18, 24, MODE_A);
+	} else if (RTC_get_alarm_enable_disable() == RTC_ALARM_ENABLED) {
+		OLED_draw_xbm(106, 37, alarmBellIconArmed, 18, 24, MODE_A);
+	}
+	
+	
 	
 	OLED_display_buffer();
 }
