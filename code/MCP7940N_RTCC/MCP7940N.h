@@ -1,6 +1,6 @@
 /*
  **************************************************************
- * MCP7940N.c
+ * MCP7940N.h
  * Author: Tom
  * Date: 17/11/2023
  * AVR Library for the real time clock and calendar chip,
@@ -96,6 +96,10 @@
 #define RTC_ALARM_INACTIVE 0x00
 #define RTC_ALARM_ACTIVE 0x01
 
+/* #define RTC_FULL_RESET */
+
+#define RTC_BACKUP_BATTERY_ENABLE 0x08
+
 /* Private functions */
 uint8_t _read_register(uint8_t regAddr);
 void _read_multiple_registers(uint8_t startAddr, uint8_t* data, uint8_t numOfReads);
@@ -140,5 +144,6 @@ uint8_t RTC_get_alarm_time_seconds_int();
 uint8_t RTC_get_alarm_time_minutes_int();
 uint8_t RTC_get_alarm_time_hours_int();
 void RTC_get_alarm_time_string(char string[9]);
+uint8_t RTC_get_alarm_enable_disable();
 
 #endif /* MCP7940M_H_ */

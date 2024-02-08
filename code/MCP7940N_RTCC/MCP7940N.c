@@ -118,7 +118,15 @@ void RTC_init() {
 	i2c_set_bitrate(RTC_I2C_BITRATE);
 	i2c_start(RTC_ADDR | RTC_I2C_WRITE);
 	i2c_write(RTC_SECONDS_REGISTER);
+	
+	/* 
+	Don't need this while using backup battery as it 
+	will reset seconds back to zero 
+	*/
+	#ifdef RTC_FULL_RESET
 	i2c_write(RTC_OSCILLATOR_ENABLE);
+	#endif /* RTC_FULL_RESET */
+	
 	i2c_stop();
 	
 	_alarmEnabled = RTC_ALARM_DISABLED;
@@ -221,7 +229,8 @@ void RTC_set_weekday(uint8_t day) {
 	if ((day <= 0) || (day > 7)) {
 		return;
 	}
-	_write_register(RTC_WEEKDAY_REGISTER, day);
+	
+	_write_register(RTC_WEEKDAY_REGISTER, day | RTC_BACKUP_BATTERY_ENABLE);
 }
 
 /*
@@ -592,4 +601,8 @@ void RTC_get_alarm_time_string(char string[9]) {
 	string[6] = (_alarmTime[0] / 10) + 48;
 	string[7] = (_alarmTime[0] % 10) + 48;
 	string[8] = '\0';
+}
+
+uint8_t RTC_get_alarm_enable_disable() {
+	return _alarmEnabled;
 }
