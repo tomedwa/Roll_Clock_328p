@@ -26,6 +26,7 @@
 #include "XBM_symbols/XBM_symbols.h"
 #include "AM2320_temperature_humidity/AM2320_temperature_humidity.h"
 #include "piezo_buzzer_328p/piezo_buzzer_328p.h"
+#include "buttons/buttons.h"
 #include "roll_clock_modes/MODE_A.h"
 #include "roll_clock_modes/MODE_B.h"
 #include "roll_clock_modes/MODE_C.h"
@@ -69,6 +70,8 @@ int main(void) {
 	MODE_A_init();
 	MODE_B_init();
 	
+	buttons_init();
+	
 	i2c_init();					/* i2c for MCU */
 	A328p_SPI_init();			/* SPI for MCU */
 	OLED_init();				/* SH1106 OLED display */
@@ -76,14 +79,19 @@ int main(void) {
 	RTC_init();					/* Clock IC */
 	USART_init();				/* USART for MCU */
 	ADXL343_setup_axis_read();	/* Using i2c mode */
+	ADXL343_double_tap_init();
 	buzzer_init();
 	sei();	
 	RTC_alarm_enable_disable(RTC_ALARM_ENABLED);
 	
-	RTC_set_time(0x23, 0x59, 0x55);
-	RTC_set_alarm_time(0x00, 0x00, 0x05);
-	RTC_set_weekday(1);
-	RTC_set_date(0x31, 0x12, 0x98);
+	#ifdef RTC_FULL_RESET
+		RTC_set_time(0x23, 0x59, 0x55);
+		RTC_set_weekday(1);
+		RTC_set_date(0x31, 0x12, 0x98);
+	#endif /* RTC_FULL_RESET */
+	
+	
+	RTC_set_alarm_time(0x15, 0x18, 0x05);
 	
 	/* Current and previous times used for delays */
 	uint32_t currentTime;
@@ -105,6 +113,7 @@ int main(void) {
 	DDRC &= ~(1 << 3); /* Alarm off */
 
     while (1) {
+		
 		/* Update current system time */
 		currentTime = timer0_get_current_time(); 
 		
@@ -254,6 +263,7 @@ void update_temp_humidity_sensor(uint32_t currentTime, uint32_t* previousTimes) 
 void alarm_match_handling(uint32_t currentTime, uint32_t* previousTimes, uint8_t* displayInvertedStatus) {
 	/* Check if the alarm is activated and invert the display if necessary */
 	if (RTC_check_alarm_match() == RTC_ALARM_ACTIVE) {
+				
 		if ((currentTime - previousTimes[INVERT_DISPLAY_ALARM_INDEX]) > INVERT_DISPLAY_ALARM_INTERVAL) {
 			*displayInvertedStatus ^= 1;
 			previousTimes[INVERT_DISPLAY_ALARM_INDEX] = currentTime;
@@ -266,9 +276,11 @@ void alarm_match_handling(uint32_t currentTime, uint32_t* previousTimes, uint8_t
 		}
 	}
 	
-	if (!!(PINC & (1<<3)) == 1) {
+	if (ADXL343_get_double_tap_status() == ADXL343_DOUBLETAP_DETECTED && RTC_check_alarm_match() == RTC_ALARM_ACTIVE) {
 		RTC_alarm_deactivate();
+		ADXL343_clear_double_tap();
 	}
+	
 	
 	if (*displayInvertedStatus == DISPLAY_INVERTED) {
 		buzzer_play_tone();
