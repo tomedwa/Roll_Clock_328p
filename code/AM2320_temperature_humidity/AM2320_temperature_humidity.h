@@ -1,6 +1,6 @@
 /*
  **************************************************************
- * AM2320_temperature_humidity.c
+ * AM2320_temperature_humidity.h
  * Author: Tom
  * Date: 18/01/2023
  * AVR Library for the AM2320 temperature and humidity
