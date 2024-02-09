@@ -29,6 +29,12 @@
 static uint8_t _selectButtonStatus;
 static uint8_t _nextButtonStatus;
 
+/*
+* buttons_init()
+* --------------
+* External function to initialise the pins for all buttons on the roll clock project along with
+* the associated interrupt routines.
+*/
 void buttons_init() {
 	_selectButtonStatus = BUTTON_RELEASED;
 	_nextButtonStatus = BUTTON_PRESSED;
@@ -46,14 +52,29 @@ void buttons_init() {
 	
 }
 
+/*
+* buttons_select_status()
+* -----------------------
+* External function to get the current status of the SELECT button.
+*/
 uint8_t buttons_select_status() {
 	return _selectButtonStatus;
 }
 
+/*
+* buttons_next_status()
+* -----------------------
+* External function to get the current status of the NEXT button.
+*/
 uint8_t buttons_next_status() {
 	return _nextButtonStatus;
 }
 
+/*
+* buttons_button_down()
+* ---------------------
+* External function to check the logic level of a pin for a specific button.
+*/
 uint8_t buttons_button_down(uint8_t button) {
 	uint8_t returnVal = 0;
 	
@@ -69,13 +90,27 @@ uint8_t buttons_button_down(uint8_t button) {
 	return returnVal;
 }
 
+/*
+* buttons_select_set_status()
+* ---------------------------
+* External function to set the current status of the SELECT button.
+*/
 void buttons_select_set_status(uint8_t status) {
 	_selectButtonStatus = status;
 }
+
+/*
+* buttons_next_set_status()
+* ---------------------------
+* External function to set the current status of the NEXT button.
+*/
 void buttons_next_set_status(uint8_t status) {
 	_nextButtonStatus = status;
 }
 
+/*
+* Interrupt service routine for the SELECT button.
+*/
 ISR(INT0_vect) {
 	/* Disable further interrupts on INT0 */
 	EIMSK &= ~(1 << INT0);
@@ -89,6 +124,9 @@ ISR(INT0_vect) {
 	EIMSK |= (1 << INT0);
 }
 
+/*
+* Interrupt service routine for the NEXT button.
+*/
 ISR(INT1_vect) {
 	/* Disable further interrupts on INT1 */
 	EIMSK &= ~(1 << INT1);
