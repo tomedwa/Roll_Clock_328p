@@ -67,31 +67,23 @@ void alarm_match_handling(uint32_t currentTime, uint32_t* previousTimes, uint8_t
 
 int main(void) {
 	
+	/* Initialise the Roll clock modes */
 	MODE_A_init();
 	MODE_B_init();
 	
+	/* Initialise the roll clock buttons */
 	buttons_init();
 	
+	/* Initialise hardware */
 	i2c_init();					/* i2c for MCU */
 	A328p_SPI_init();			/* SPI for MCU */
 	OLED_init();				/* SH1106 OLED display */
 	timer0_init();				/* Initialise timer0 to generate interrupts every 1ms */
 	RTC_init();					/* Clock IC */
-	USART_init();				/* USART for MCU */
 	ADXL343_setup_axis_read();	/* Using i2c mode */
-	ADXL343_double_tap_init();
-	buzzer_init();
-	sei();	
-	RTC_alarm_enable_disable(RTC_ALARM_ENABLED);
-	
-	#ifdef RTC_FULL_RESET
-		RTC_set_time(0x23, 0x59, 0x55);
-		RTC_set_weekday(1);
-		RTC_set_date(0x31, 0x12, 0x98);
-	#endif /* RTC_FULL_RESET */
-	
-	
-	RTC_set_alarm_time(0x15, 0x18, 0x05);
+	ADXL343_double_tap_init();	/* Allow double tap to interrupts */
+	buzzer_init();				/* Beep beep */
+	sei();						/* Enable global interrupts */
 	
 	/* Current and previous times used for delays */
 	uint32_t currentTime;
@@ -109,9 +101,16 @@ int main(void) {
 	buzzer_set_frequency(444);
 	buzzer_stop_tone();
 	
-	/* Not permanent solution */
-	DDRC &= ~(1 << 3); /* Alarm off */
-
+	/* Temporary stuff here ******************************************************** */
+	RTC_alarm_enable_disable(RTC_ALARM_ENABLED);
+	RTC_set_alarm_time(0x15, 0x18, 0x05);
+	#ifdef RTC_FULL_RESET
+		RTC_set_time(0x23, 0x59, 0x55);
+		RTC_set_weekday(1);
+		RTC_set_date(0x31, 0x12, 0x98);
+	#endif /* RTC_FULL_RESET */
+	/* ***************************************************************************** */
+	
     while (1) {
 		/* Update current system time */
 		currentTime = timer0_get_current_time(); 
