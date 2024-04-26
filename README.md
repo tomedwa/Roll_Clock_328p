@@ -12,5 +12,3 @@ wip, update soon.
 | MCP7940N_RTCC | https://github.com/tomedwa/MCP7940N_RTCC |
 | ADXL343_accelerometer | https://github.com/tomedwa/ADXL343_accelerometer |
 | AM2320_temperature_humidity_sensor | https://github.com/tomedwa/AM2320_temperature_humidity_sensor |
-| Atmega328p_USART | https://github.com/tomedwa/Atmega328p_USART |
-| Atmega328p_SPI | https://github.com/tomedwa/Atmega328p_SPI |
